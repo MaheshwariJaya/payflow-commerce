@@ -1,0 +1,264 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum TransactionState {
+  CREATED
+  ROUTE_SELECTED
+  AUTH_INITIATED
+  AUTHORISED
+  AUTH_FAILED
+  CAPTURE_INITIATED
+  CAPTURED
+  PARTIALLY_CAPTURED
+  CAPTURE_FAILED
+  REFUND_INITIATED
+  REFUNDED
+  FAILED
+  VOID_INITIATED
+  VOIDED
+  AUTH_EXPIRED
+  PARTIALLY_REFUNDED
+  REFUND_FAILED
+  SETTLED
+}
+
+enum CircuitState {
+  CLOSED
+  OPEN
+  HALF_OPEN
+}
+
+enum WebhookStatus {
+  QUEUED
+  PROCESSING
+  RETRYING
+  PROCESSED
+  FAILED
+  DEAD
+}
+
+model Transaction {
+  id                   String            @id @default(uuid()) @db.Uuid
+  merchant_order_id    String            @db.VarChar(255)
+  amount_paise         BigInt            // Stored in smallest unit (paise/cents)
+  currency             String            @default("INR") @db.VarChar(3)
+  status               TransactionState  @default(CREATED)
+  payment_method       String            @db.VarChar(30) // e.g. "CARD", "UPI", "NETBANKING"
+  customer_id          String            @db.VarChar(100)
+  idempotency_key      String            @unique @db.VarChar(255)
+  gateway_name         String?           @db.VarChar(50)  // Selected gateway
+  gateway_reference_id String?           @db.VarChar(255) // Reference ID from the gateway
+  trace_id             String            @db.VarChar(255)
+  
+  // Retry metadata
+  retry_count          Int               @default(0)
+  next_retry_at        DateTime?
+  last_error           String?           @db.Text
+
+  attempts             Int               @default(0)
+  metadata             Json?
+  created_at           DateTime          @default(now())
+  updated_at           DateTime          @updatedAt
+
+  // Relations
+  state_logs          TransactionStateLog[]
+  refunds             Refund[]
+  reconciliation_logs ReconciliationLog[]
+
+  @@index([status])
+  @@index([gateway_name])
+  @@index([created_at])
+  @@index([gateway_reference_id])
+  @@index([merchant_order_id])
+}
+
+model TransactionStateLog {
+  id             String           @id @default(uuid()) @db.Uuid
+  transaction_id String           @db.Uuid
+  from_state     TransactionState
+  to_state       TransactionState
+  gateway        String?          @db.VarChar(50)
+  reason         String?          @db.VarChar(255)
+  metadata       Json?
+  created_by     String           @db.VarChar(100) // e.g. "payment_service", "webhook_processor"
+  trace_id       String           @db.VarChar(255)
+  created_at     DateTime         @default(now())
+
+  // Relations
+  transaction    Transaction      @relation(fields: [transaction_id], references: [id], onDelete: Cascade)
+
+  @@index([transaction_id])
+  @@index([created_at])
+}
+
+model GatewayConfig {
+  id                String   @id @default(uuid()) @db.Uuid
+  name              String   @unique @db.VarChar(50) // Razorpay, Stripe, PayU, UPI
+  is_active         Boolean  @default(true)
+  base_url          String   @db.VarChar(255)
+  api_key           String   @db.VarChar(255) // Encrypted string
+  api_secret        String?  @db.VarChar(255) // Encrypted webhook secret
+  supported_methods String[] // Array of supported payment methods (CARD, UPI, NETBANKING)
+  success_rate      Float    @default(1.0)
+  avg_latency_ms    Float    @default(200.0)
+  cost_per_tx_paise BigInt   @default(0)
+  cost_percentage   Float    @default(0.0)    // e.g. 2% = 0.02
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+}
+
+model RoutingConfig {
+  id                         String   @id @default(uuid()) @db.Uuid
+  success_rate_weight        Float    @default(0.4)
+  latency_weight             Float    @default(0.2)
+  cost_weight                Float    @default(0.2)
+  health_weight              Float    @default(0.1)
+  payment_method_fit_weight  Float    @default(0.1)
+  
+  // JSON field representing method priority preferences, e.g. {"UPI": ["UPI", "Razorpay"], "CARD": ["Stripe", "Razorpay"]}
+  priority_matrix            Json?
+  updated_at                 DateTime @updatedAt
+}
+
+model IdempotencyKey {
+  id              String   @id @default(uuid()) @db.Uuid
+  key             String   @unique @db.VarChar(255)
+  request_hash    String   @db.VarChar(64)
+  response_status Int?
+  response_body   Json?
+  status          String   @db.VarChar(20) // "PENDING", "COMPLETED"
+  created_at      DateTime @default(now())
+  expires_at      DateTime
+
+  @@index([key])
+  @@index([expires_at])
+}
+
+model ProcessedWebhookEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  event_id   String   @db.VarChar(255)
+  gateway    String   @db.VarChar(50)
+  status     String   @db.VarChar(20) // "PROCESSED", "FAILED"
+  payload    Json
+  created_at DateTime @default(now())
+
+  @@unique([gateway, event_id])
+  @@index([event_id])
+}
+
+model GatewayHealthMetrics {
+  id                String       @id @default(uuid()) @db.Uuid
+  gateway_name      String       @db.VarChar(50)
+  payment_method    String       @db.VarChar(30)
+  state             CircuitState @default(CLOSED)
+  failure_count     Int          @default(0)
+  success_count     Int          @default(0)
+  avg_latency_ms    Float        @default(0.0)
+  success_rate      Float        @default(1.0)
+  last_state_change DateTime     @default(now())
+  updated_at        DateTime     @updatedAt
+
+  @@unique([gateway_name, payment_method])
+}
+
+model ReconciliationLog {
+  id                     String    @id @default(uuid()) @db.Uuid
+  transaction_id         String?   @db.Uuid
+  gateway_transaction_id String?   @db.VarChar(255)
+  gateway                String    @db.VarChar(50)
+  amount_paise           BigInt
+  status                 String    @db.VarChar(50) // "RECONCILED", "DISCREPANCY_AMOUNT", "DISCREPANCY_STATUS", "UNMATCHED"
+  details                String?   @db.VarChar(255)
+  trace_id               String    @db.VarChar(255)
+  retry_count            Int       @default(0)
+  next_retry_at          DateTime?
+  last_error             String?   @db.Text
+  reconciled_at          DateTime  @default(now())
+
+  // Relations
+  transaction            Transaction? @relation(fields: [transaction_id], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([reconciled_at])
+}
+
+model ReconciliationAnomaly {
+  id             String   @id @default(uuid()) @db.Uuid
+  transaction_id String?  @db.Uuid
+  gateway        String   @db.VarChar(50)
+  internal_state String
+  gateway_state  String
+  severity       String   // e.g. "HIGH", "MEDIUM", "LOW"
+  notes          String?  @db.Text
+  resolved       Boolean  @default(false)
+  created_at     DateTime @default(now())
+
+  @@index([severity])
+  @@index([resolved])
+}
+
+model Settlement {
+  id                   String   @id @default(uuid()) @db.Uuid
+  transaction_id       String   @db.Uuid
+  gateway              String   @db.VarChar(50)
+  settlement_reference String?  @db.VarChar(255)
+  amount_paise         BigInt
+  settlement_date      DateTime
+  status               String   @db.VarChar(50) // "PENDING", "SETTLED", "FAILED"
+  created_at           DateTime @default(now())
+
+  @@index([transaction_id])
+  @@index([settlement_date])
+}
+
+model Refund {
+  id                 String   @id @default(uuid()) @db.Uuid
+  transaction_id     String   @db.Uuid
+  gateway_refund_id  String?  @unique @db.VarChar(255)
+  amount_paise       BigInt
+  status             String   @db.VarChar(30) // "REFUND_INITIATED", "REFUNDED", "REFUND_FAILED"
+  reason             String   @db.VarChar(255)
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  // Relations
+  transaction        Transaction @relation(fields: [transaction_id], references: [id], onDelete: Cascade)
+
+  @@index([transaction_id])
+}
+
+model WebhookQueueLog {
+  id            String        @id @default(uuid()) @db.Uuid
+  event_id      String        @db.VarChar(255)
+  gateway       String        @db.VarChar(50)
+  payload       Json
+  attempts      Int           @default(0)
+  error_message String?       @db.Text
+  status        WebhookStatus @default(QUEUED)
+  trace_id      String        @db.VarChar(255)
+  retry_count   Int           @default(0)
+  next_retry_at DateTime?
+  last_error    String?       @db.Text
+  created_at    DateTime      @default(now())
+  updated_at    DateTime      @updatedAt
+
+  @@index([status])
+  @@index([event_id])
+}
+
+model DeadLetterQueue {
+  id            String   @id @default(uuid()) @db.Uuid
+  event_id      String   @db.VarChar(255)
+  gateway       String   @db.VarChar(50)
+  payload       Json
+  error_message String   @db.Text
+  failed_at     DateTime @default(now())
+
+  @@index([event_id])
+}

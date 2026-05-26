@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PayFlow Commerce - Admin Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/png" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💳</text></svg>">
+</head>
+<body>
+  <!-- Ambient glowing background blobs -->
+  <div class="bg-glow-1"></div>
+  <div class="bg-glow-2"></div>
+
+  <div class="dashboard-container">
+    <!-- Header -->
+    <header class="dashboard-header glass">
+      <div class="logo-area">
+        <span class="logo-icon">💳</span>
+        <div>
+          <h1>PayFlow Commerce</h1>
+          <p class="subtitle">Payment Orchestration Layer</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div class="api-key-box">
+          <label for="admin-key">Admin API Key</label>
+          <input type="password" id="admin-key" value="admin-key-12345" placeholder="Enter X-API-Key">
+        </div>
+        <button id="btn-refresh" class="btn btn-primary">Refresh Metrics</button>
+      </div>
+    </header>
+
+    <!-- Metrics Cards -->
+    <section class="metrics-grid">
+      <!-- Card 1: Volume -->
+      <div class="metric-card glass hover-glow">
+        <div class="card-header">
+          <h3>Total Transaction Volume</h3>
+          <span class="card-icon">📈</span>
+        </div>
+        <div class="metric-val" id="val-volume">INR 0.00</div>
+        <div class="metric-sub" id="val-volume-tx-count">0 settled payments</div>
+      </div>
+
+      <!-- Card 2: Success Rate -->
+      <div class="metric-card glass hover-glow">
+        <div class="card-header">
+          <h3>Global Success Rate</h3>
+          <span class="card-icon">⚡</span>
+        </div>
+        <div class="metric-val" id="val-success-rate">100.0%</div>
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill" id="fill-success-rate" style="width: 100%"></div>
+        </div>
+      </div>
+
+      <!-- Card 3: Anomalies -->
+      <div class="metric-card glass hover-glow" id="card-anomalies">
+        <div class="card-header">
+          <h3>Active Anomalies</h3>
+          <span class="card-icon">⚠️</span>
+        </div>
+        <div class="metric-val text-warning" id="val-anomalies">0</div>
+        <div class="metric-sub">Pending manual resolution</div>
+      </div>
+
+      <!-- Card 4: DLQ Backlog -->
+      <div class="metric-card glass hover-glow" id="card-dlq">
+        <div class="card-header">
+          <h3>DLQ Depth</h3>
+          <span class="card-icon">📥</span>
+        </div>
+        <div class="metric-val text-danger" id="val-dlq">0</div>
+        <div class="metric-sub" id="val-webhook-backlog">0 pending in webhook queue</div>
+      </div>
+    </section>
+
+    <!-- Main Workspace -->
+    <main class="workspace-grid">
+      <!-- Left Column: Gateways & Controls -->
+      <div class="workspace-col-left">
+        <!-- Gateway Circuits -->
+        <div class="panel glass">
+          <h2>Gateway Circuit Statuses</h2>
+          <div class="gateway-list" id="gateway-circuits-list">
+            <!-- Dynamic inject -->
+            <p class="loading">Loading health states...</p>
+          </div>
+        </div>
+
+        <!-- Simulator & Controls -->
+        <div class="panel glass">
+          <h2>Simulation Control Center</h2>
+          <div class="control-tabs">
+            <button class="tab-btn active" data-tab="tab-webhook">Simulate Webhook</button>
+            <button class="tab-btn" data-tab="tab-reconciliation">Reconciliation</button>
+          </div>
+
+          <!-- Webhook Simulator tab -->
+          <div class="tab-content" id="tab-webhook">
+            <p class="tab-desc">Simulate direct asynchronous callbacks from Stripe or Razorpay to test queue deduplication and compensating states.</p>
+            <form id="webhook-simulator-form" class="form-grid">
+              <div class="form-group">
+                <label for="sim-gateway">Gateway</label>
+                <select id="sim-gateway">
+                  <option value="Stripe">Stripe</option>
+                  <option value="Razorpay">Razorpay</option>
+                  <option value="PayU">PayU</option>
+                  <option value="UPI">UPI</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="sim-tx-id">Transaction UUID</label>
+                <input type="text" id="sim-tx-id" placeholder="Paste local transaction ID">
+              </div>
+              <div class="form-group">
+                <label for="sim-event-id">Event ID</label>
+                <input type="text" id="sim-event-id" placeholder="Leave empty for random">
+              </div>
+              <div class="form-group">
+                <label for="sim-amount">Amount (paise)</label>
+                <input type="number" id="sim-amount" value="150000">
+              </div>
+              <div class="form-group">
+                <label for="sim-status">Status</label>
+                <select id="sim-status">
+                  <option value="captured">Captured (Success)</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="sim-duplicate"> Send Duplicate Hook (1s delay)
+                </label>
+              </div>
+              <button type="submit" class="btn btn-secondary btn-full">Post Mock Webhook</button>
+            </form>
+          </div>
+
+          <!-- Reconciliation Tab -->
+          <div class="tab-content hidden" id="tab-reconciliation">
+            <p class="tab-desc">Initiate manual batch reconciliation queries. Scans all captured, refunded, and abandoned transactions in the database.</p>
+            <div class="recon-actions">
+              <button id="btn-trigger-recon" class="btn btn-secondary">Trigger Batch Reconciliation</button>
+              <div class="recon-status" id="recon-trigger-result"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Logs, Anomalies & Details -->
+      <div class="workspace-col-right">
+        <!-- Anomalies Section -->
+        <div class="panel glass hidden" id="anomaly-panel">
+          <h2 class="text-warning">Reconciliation Anomalies</h2>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Gateway</th>
+                  <th>Internal State</th>
+                  <th>Gateway State</th>
+                  <th>Severity</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody id="anomaly-table-body">
+                <!-- Dynamic load -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Latest Transactions -->
+        <div class="panel glass">
+          <div class="panel-header-inline">
+            <h2>Recent Orchestrated Payments</h2>
+            <button id="btn-load-payments" class="btn btn-icon">🔄</button>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Order ID</th>
+                  <th>Gateway</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Created At</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="payments-table-body">
+                <!-- Dynamic load -->
+                <tr><td colspan="6" class="loading">Loading payments...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Detail Modal -->
+  <div id="payment-modal" class="modal-overlay hidden">
+    <div class="modal glass">
+      <div class="modal-header">
+        <h2>Payment Audit Timeline</h2>
+        <button class="close-modal" id="btn-close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="tx-meta-info">
+          <div><strong>Transaction ID:</strong> <span id="modal-tx-id"></span></div>
+          <div><strong>Order ID:</strong> <span id="modal-order-id"></span></div>
+          <div><strong>Idempotency Key:</strong> <span id="modal-idemp-key"></span></div>
+        </div>
+        <h3>State Transition Path</h3>
+        <div class="timeline" id="modal-timeline">
+          <!-- Dynamic inject -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

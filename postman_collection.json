@@ -1,0 +1,351 @@
+{
+  "info": {
+    "_postman_id": "8e3fb77a-245a-493e-bdc4-64cb237ad8b8",
+    "name": "PayFlow Commerce - Payment Orchestration Layer",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Generate Test JWT Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"customer_id\": \"cust_user_12345\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/token",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "token"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments API",
+      "item": [
+        {
+          "name": "Create Payment (Success Flow)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
+              { "key": "Idempotency-Key", "value": "{{$randomUUID}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"amount_paise\": 150000,\n    \"currency\": \"INR\",\n    \"payment_method\": \"CARD\",\n    \"customer_id\": \"cust_user_12345\",\n    \"merchant_order_id\": \"morder_{{$randomInt}}_sim_success\",\n    \"metadata\": {\n        \"cart_items_count\": 3\n    }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "payments"]
+            }
+          }
+        },
+        {
+          "name": "Create Payment (Simulate Gateway Timeout - Failover)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
+              { "key": "Idempotency-Key", "value": "{{$randomUUID}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"amount_paise\": 120000,\n    \"currency\": \"INR\",\n    \"payment_method\": \"CARD\",\n    \"customer_id\": \"cust_user_12345\",\n    \"merchant_order_id\": \"morder_{{$randomInt}}_sim_timeout\",\n    \"metadata\": {}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "payments"]
+            }
+          }
+        },
+        {
+          "name": "Get Payment Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{jwt_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/{{last_payment_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "payments", "{{last_payment_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Capture Authorized Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"amount_paise\": 150000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/{{last_payment_id}}/capture",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "payments", "{{last_payment_id}}", "capture"]
+            }
+          }
+        },
+        {
+          "name": "Refund Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"amount_paise\": 50000,\n    \"reason\": \"Item out of stock\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/{{last_payment_id}}/refund",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "payments", "{{last_payment_id}}", "refund"]
+            }
+          }
+        },
+        {
+          "name": "Void Authorized Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{jwt_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/{{last_payment_id}}/void",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "payments", "{{last_payment_id}}", "void"]
+            }
+          }
+        },
+        {
+          "name": "Get Transaction Timeline (Audit Log)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{jwt_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/{{last_payment_id}}/timeline",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "payments", "{{last_payment_id}}", "timeline"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Configs",
+      "item": [
+        {
+          "name": "Get Gateway Configs",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-API-Key", "value": "{{admin_api_key}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/config/gateways",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "config", "gateways"]
+            }
+          }
+        },
+        {
+          "name": "Update Gateway Config",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "X-API-Key", "value": "{{admin_api_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"is_active\": true,\n    \"rate_limit_capacity\": 250,\n    \"rate_limit_refill\": 250\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/config/gateways/Stripe/config",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "config", "gateways", "Stripe", "config"]
+            }
+          }
+        },
+        {
+          "name": "Get Routing weights",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-API-Key", "value": "{{admin_api_key}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/config/routing/config",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "config", "routing", "config"]
+            }
+          }
+        },
+        {
+          "name": "Update Routing Weights",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "X-API-Key", "value": "{{admin_api_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"success_rate_weight\": 0.5,\n    \"latency_weight\": 0.1,\n    \"cost_weight\": 0.2,\n    \"health_weight\": 0.1,\n    \"payment_method_fit_weight\": 0.1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/config/routing/config",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "config", "routing", "config"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Reconciliation",
+      "item": [
+        {
+          "name": "Trigger Bulk Reconciliation",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-API-Key", "value": "{{admin_api_key}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/reconciliation/trigger",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "reconciliation", "trigger"]
+            }
+          }
+        },
+        {
+          "name": "Get Active Anomalies",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-API-Key", "value": "{{admin_api_key}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/reconciliation/anomalies",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "reconciliation", "anomalies"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Webhooks",
+      "item": [
+        {
+          "name": "Replay Webhook Event",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-API-Key", "value": "{{admin_api_key}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/webhooks/replay/{{webhook_event_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "webhooks", "replay", "{{webhook_event_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Analytics",
+      "item": [
+        {
+          "name": "Get Dashboard Metrics",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-API-Key", "value": "{{admin_api_key}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/analytics/dashboard",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "analytics", "dashboard"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "System Health",
+      "item": [
+        {
+          "name": "Get Prometheus Metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/metrics",
+              "host": ["{{base_url}}"],
+              "path": ["metrics"]
+            }
+          }
+        },
+        {
+          "name": "Get System Health Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/health",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "health"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [""]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [""]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:3000", "type": "string" },
+    { "key": "admin_api_key", "value": "admin-key-12345", "type": "string" },
+    { "key": "jwt_token", "value": "insert_token_here", "type": "string" },
+    { "key": "last_payment_id", "value": "insert_uuid_here", "type": "string" },
+    { "key": "webhook_event_id", "value": "insert_event_id_here", "type": "string" }
+  ]
+}

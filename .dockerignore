@@ -1,0 +1,13 @@
+node_modules
+dist
+.env
+.git
+.gitignore
+.github
+Dockerfile
+docker-compose*
+README.md
+tests
+k6-load-test.js
+postman_collection.json
+sample_webhook_payloads.json

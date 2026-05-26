@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  # Database Service
+  postgres:
+    image: postgres:15-alpine
+    container_name: payflow_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: payflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d payflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Cache & Queue Broker Service
+  redis:
+    image: redis:7-alpine
+    container_name: payflow_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Express API Application Service
+  api:
+    build: .
+    container_name: payflow_api
+    command: >
+      sh -c "npx prisma db push &&
+             npx prisma db seed &&
+             node dist/server.js"
+    environment:
+      - PORT=3000
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/payflow?schema=public
+      - REDIS_URL=redis://redis:6379
+      - ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      - JWT_SECRET=supersecretjwtkeyforpayflow
+      - ADMIN_API_KEY=admin-key-12345
+      - STRIPE_WEBHOOK_SECRET=whsec_stripe_test_secret
+      - RAZORPAY_WEBHOOK_SECRET=whsec_razorpay_test_secret
+      - PAYU_WEBHOOK_SECRET=whsec_payu_test_secret
+      - UPI_WEBHOOK_SECRET=whsec_upi_test_secret
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Background Queue Workers Service
+  worker:
+    build: .
+    container_name: payflow_worker
+    command: node dist/queue/worker-runner.js
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/payflow?schema=public
+      - REDIS_URL=redis://redis:6379
+      - ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      - JWT_SECRET=supersecretjwtkeyforpayflow
+      - ADMIN_API_KEY=admin-key-12345
+      - STRIPE_WEBHOOK_SECRET=whsec_stripe_test_secret
+      - RAZORPAY_WEBHOOK_SECRET=whsec_razorpay_test_secret
+      - PAYU_WEBHOOK_SECRET=whsec_payu_test_secret
+      - UPI_WEBHOOK_SECRET=whsec_upi_test_secret
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+
+  # Nginx Reverse Proxy / Load Balancer Service
+  nginx:
+    image: nginx:alpine
+    container_name: payflow_proxy
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  redisdata:
