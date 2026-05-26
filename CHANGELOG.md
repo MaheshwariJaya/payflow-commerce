@@ -43,10 +43,14 @@ All notable changes and architectural features built for **PayFlow Commerce - Pa
   - Set up `docker-compose.yml` defining PostgreSQL (db), Redis, Nginx reverse proxy, API, and worker services.
 
 ### Fixed
+- Removed all single-line (`//`) and block (`/* */`) comments from all TypeScript source and test files in the codebase to ensure clean and uncommented source delivery.
 - Resolved all compiler and linter unused-variable/unused-import errors across all controllers, adapters, queue workers, and tests.
 - Replaced standard console logging statements in configuration connection handlers with the unified Winston/Pino logger.
 - Addressed Docker Alpine initialization error where the Prisma engine failed to load due to missing shared SSL libraries.
+- Standardized project-wide code style rules by creating root-level `eslint.config.js` (supporting flat config format) and `.prettierrc` files, enabling `varsIgnorePattern` and `caughtErrorsIgnorePattern` for underscore-prefixed variables.
+- Corrected inline require imports inside test specifications to standard ESM top-level module imports.
 
 ### Verified
-- Executed full test suite containing 16 unit and integration tests (idempotency, failovers, state machine, routing, and circuit breaker logic) with 100% success rate.
+- Executed full Jest test suite (16 tests) with a 100% pass rate.
+- Validated eslint and prettier formatting across the entire codebase to run clean with exit code 0.
 - Validated Docker container boot-up sequence from a clean state.
