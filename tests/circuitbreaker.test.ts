@@ -49,7 +49,7 @@ describe('Circuit Breaker Manager Tests', () => {
 
   test('Should transition OPEN to HALF_OPEN after cooldown period has elapsed', async () => {
     const pastDate = new Date(Date.now() - 40000); // 40 seconds ago (cooldown is 30s)
-    
+
     (redis.get as jest.Mock).mockImplementation((key: string) => {
       if (key.endsWith(':state')) return Promise.resolve(CircuitState.OPEN);
       if (key.endsWith(':last_change')) return Promise.resolve(pastDate.toISOString());
@@ -57,7 +57,7 @@ describe('Circuit Breaker Manager Tests', () => {
     });
 
     const isAvailable = await CircuitBreakerManager.isAvailable('Stripe', 'CARD', mockPrisma, 'test-trace');
-    
+
     // Cooldown elapsed, should trip to HALF_OPEN and return true
     expect(isAvailable).toBe(true);
     expect(redis.set).toHaveBeenCalledWith('cb:Stripe:CARD:state', CircuitState.HALF_OPEN);

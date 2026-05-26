@@ -18,11 +18,11 @@ export class LockUtil {
   public static async acquireRedisLock(key: string, ttlMs: number = 5000): Promise<string | null> {
     const token = crypto.randomUUID();
     const redisKey = `lock:${key}`;
-    
+
     // NX: Set only if key does not exist
     // PX: Set expire time in milliseconds
     const result = await redis.set(redisKey, token, 'PX', ttlMs, 'NX');
-    
+
     if (result === 'OK') {
       return token;
     }
@@ -48,12 +48,9 @@ export class LockUtil {
     const hash = crypto.createHash('sha256').update(key).digest();
     // Read the first 8 bytes as a 64-bit integer (signed bigint)
     const lockId = hash.readBigInt64BE(0);
-    
+
     // Acquire a transaction-level exclusive advisory lock
     // pg_advisory_xact_lock blocks until lock is available
-    await prisma.$executeRawUnsafe(
-      `SELECT pg_advisory_xact_lock($1)`,
-      lockId
-    );
+    await prisma.$executeRawUnsafe(`SELECT pg_advisory_xact_lock($1)`, lockId);
   }
 }

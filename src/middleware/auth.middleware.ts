@@ -16,7 +16,9 @@ export function authenticateJWT(req: AuthenticatedRequest, res: Response, next: 
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Unauthorized', message: 'Missing or invalid token format. Expected Bearer <token>' });
+    res
+      .status(401)
+      .json({ error: 'Unauthorized', message: 'Missing or invalid token format. Expected Bearer <token>' });
     return;
   }
 
@@ -39,9 +41,9 @@ export function authenticateApiKey(req: Request, res: Response, next: NextFuncti
   const apiKey = req.headers['x-api-key'] || req.headers['x-api-key'.toLowerCase()];
 
   if (!apiKey || apiKey !== ADMIN_API_KEY) {
-    logger.warn('Unauthorized API Key attempt', { 
-      ip: req.ip, 
-      path: req.path 
+    logger.warn('Unauthorized API Key attempt', {
+      ip: req.ip,
+      path: req.path,
     });
     res.status(401).json({ error: 'Unauthorized', message: 'Invalid or missing administrative API Key (X-API-Key)' });
     return;
@@ -55,11 +57,10 @@ export function authenticateApiKey(req: Request, res: Response, next: NextFuncti
  */
 export function authenticateJWTOrApiKey(req: Request, res: Response, next: NextFunction): void {
   const apiKey = req.headers['x-api-key'] || req.headers['x-api-key'.toLowerCase()];
-  
+
   if (apiKey) {
     return authenticateApiKey(req, res, next);
   }
-  
+
   return authenticateJWT(req, res, next);
 }
-

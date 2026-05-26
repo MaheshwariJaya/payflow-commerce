@@ -15,7 +15,6 @@ const mockFindUnique = (global as any).mockFindUnique;
 const mockCreate = (global as any).mockCreate;
 const mockUpdate = (global as any).mockUpdate;
 
-
 // Mock LockUtil
 jest.mock('../src/utils/lock.util', () => ({
   LockUtil: {
@@ -31,7 +30,7 @@ describe('Idempotency Middleware Tests', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     req = {
       method: 'POST',
       headers: {
@@ -85,7 +84,7 @@ describe('Idempotency Middleware Tests', () => {
   test('Should return cached response on duplicate completed requests', async () => {
     (LockUtil.acquireRedisLock as jest.Mock).mockResolvedValue('mock-token-abc');
     (LockUtil.releaseRedisLock as jest.Mock).mockResolvedValue(true);
-    
+
     // Hash matching current body { amount: 5000 }
     const crypto = require('crypto');
     const hash = crypto.createHash('sha256').update(JSON.stringify(req.body)).digest('hex');
@@ -109,7 +108,7 @@ describe('Idempotency Middleware Tests', () => {
   test('Should return 400 Bad Request if key is reused with different request payload', async () => {
     (LockUtil.acquireRedisLock as jest.Mock).mockResolvedValue('mock-token-abc');
     (LockUtil.releaseRedisLock as jest.Mock).mockResolvedValue(true);
-    
+
     mockFindUnique.mockResolvedValue({
       key: 'test-idemp-key-123',
       request_hash: 'different-payload-hash-xyz', // Mismatch!
@@ -133,7 +132,7 @@ describe('Idempotency Middleware Tests', () => {
   test('Should return 409 Conflict if duplicate request arrives while initial is still PENDING', async () => {
     (LockUtil.acquireRedisLock as jest.Mock).mockResolvedValue('mock-token-abc');
     (LockUtil.releaseRedisLock as jest.Mock).mockResolvedValue(true);
-    
+
     const crypto = require('crypto');
     const hash = crypto.createHash('sha256').update(JSON.stringify(req.body)).digest('hex');
 

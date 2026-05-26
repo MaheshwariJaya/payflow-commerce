@@ -3,7 +3,8 @@ export const openapiSpec = {
   info: {
     title: 'PayFlow Commerce - Payment Orchestration Layer API',
     version: '1.0.0',
-    description: 'Production-grade Payment Orchestration API supporting multi-gateway failover, circuit breakers, dynamic routing, webhooks deduplication, and reconciliation checks.',
+    description:
+      'Production-grade Payment Orchestration API supporting multi-gateway failover, circuit breakers, dynamic routing, webhooks deduplication, and reconciliation checks.',
   },
   servers: [
     {
@@ -67,7 +68,8 @@ export const openapiSpec = {
     '/api/v1/payments': {
       post: {
         summary: 'Initiate a Payment Request',
-        description: 'Intelligently routes a payment through active gateways based on scoring weights and priority matrix. Evaluates rate limits and circuit breaker status dynamically.',
+        description:
+          'Intelligently routes a payment through active gateways based on scoring weights and priority matrix. Evaluates rate limits and circuit breaker status dynamically.',
         security: [{ BearerAuth: [] }],
         parameters: [
           {
@@ -249,7 +251,8 @@ export const openapiSpec = {
     '/api/v1/webhooks/{gateway}': {
       post: {
         summary: 'Receive Gateway Webhooks',
-        description: 'Endpoint to accept asynchronous gateway webhooks. Validates signatures and timestamp replay windows, processes composite deduplication, and queues events.',
+        description:
+          'Endpoint to accept asynchronous gateway webhooks. Validates signatures and timestamp replay windows, processes composite deduplication, and queues events.',
         parameters: [
           {
             name: 'gateway',

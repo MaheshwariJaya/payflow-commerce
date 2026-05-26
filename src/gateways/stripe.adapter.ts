@@ -17,7 +17,7 @@ export class StripeAdapter implements IGatewayAdapter {
     traceId: string
   ): Promise<GatewayResponse> {
     const trigger = SimulatorService.parseTrigger(this.name, merchantOrderId, metadata);
-    
+
     // Simulate delay
     if (trigger.latencyMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, trigger.latencyMs));
@@ -45,7 +45,7 @@ export class StripeAdapter implements IGatewayAdapter {
 
     // Default Success Flow
     const gatewayRef = `pi_${transactionId}`;
-    
+
     // Trigger webhook asynchronously (out-of-order scenario if requested)
     const webhookDelay = trigger.scenario === 'OUT_OF_ORDER' ? 0 : 500;
     const actualDelay = trigger.scenario === 'DELAYED_WEBHOOK' ? 8000 : webhookDelay;
@@ -110,11 +110,7 @@ export class StripeAdapter implements IGatewayAdapter {
     };
   }
 
-  public async voidPayment(
-    transactionId: string,
-    gatewayRefId: string,
-    traceId: string
-  ): Promise<GatewayResponse> {
+  public async voidPayment(transactionId: string, gatewayRefId: string, traceId: string): Promise<GatewayResponse> {
     return {
       success: true,
       gatewayReferenceId: gatewayRefId,
@@ -126,14 +122,10 @@ export class StripeAdapter implements IGatewayAdapter {
     };
   }
 
-  public verifyWebhookSignature(
-    headers: Record<string, string>,
-    rawBody: string,
-    secret: string
-  ): boolean {
+  public verifyWebhookSignature(headers: Record<string, string>, rawBody: string, secret: string): boolean {
     try {
       const stripeHeader = headers['stripe-signature'] || '';
-      
+
       // Parse header: t=12345,v1=abcde
       const parts = stripeHeader.split(',');
       const tPart = parts.find((p) => p.startsWith('t='));

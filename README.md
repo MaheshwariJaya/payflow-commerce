@@ -90,11 +90,27 @@ To test the failover and error recovery pipelines, pass specific trigger strings
 
 ---
 
-## Testing Command lines
+## Development & Testing Command lines
 
 ### Run Jest Test Suite (Unit & Integration)
 ```bash
 npm run test
+```
+
+### Code Style & Linting
+Ensure code quality and style standards are maintained:
+```bash
+# Check code for linting issues
+npm run lint
+
+# Fix fixable linting issues
+npm run lint:fix
+
+# Check formatting issues with Prettier
+npm run format
+
+# Format all files with Prettier
+npm run format:fix
 ```
 
 ### Run k6 Load Performance test

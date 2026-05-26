@@ -8,20 +8,41 @@ export const domainEvents = new EventEmitter();
 // Allowed direct transitions
 const VALID_TRANSITIONS: Record<TransactionState, Set<TransactionState>> = {
   [TransactionState.CREATED]: new Set([TransactionState.ROUTE_SELECTED, TransactionState.FAILED]),
-  [TransactionState.ROUTE_SELECTED]: new Set([TransactionState.ROUTE_SELECTED, TransactionState.AUTH_INITIATED, TransactionState.AUTH_FAILED, TransactionState.FAILED]),
-  [TransactionState.AUTH_INITIATED]: new Set([TransactionState.AUTHORISED, TransactionState.AUTH_FAILED, TransactionState.FAILED]),
-  [TransactionState.AUTHORISED]: new Set([TransactionState.CAPTURE_INITIATED, TransactionState.VOID_INITIATED, TransactionState.AUTH_EXPIRED]),
+  [TransactionState.ROUTE_SELECTED]: new Set([
+    TransactionState.ROUTE_SELECTED,
+    TransactionState.AUTH_INITIATED,
+    TransactionState.AUTH_FAILED,
+    TransactionState.FAILED,
+  ]),
+  [TransactionState.AUTH_INITIATED]: new Set([
+    TransactionState.AUTHORISED,
+    TransactionState.AUTH_FAILED,
+    TransactionState.FAILED,
+  ]),
+  [TransactionState.AUTHORISED]: new Set([
+    TransactionState.CAPTURE_INITIATED,
+    TransactionState.VOID_INITIATED,
+    TransactionState.AUTH_EXPIRED,
+  ]),
   [TransactionState.AUTH_FAILED]: new Set([TransactionState.FAILED]),
-  [TransactionState.CAPTURE_INITIATED]: new Set([TransactionState.CAPTURED, TransactionState.PARTIALLY_CAPTURED, TransactionState.CAPTURE_FAILED]),
+  [TransactionState.CAPTURE_INITIATED]: new Set([
+    TransactionState.CAPTURED,
+    TransactionState.PARTIALLY_CAPTURED,
+    TransactionState.CAPTURE_FAILED,
+  ]),
   [TransactionState.CAPTURED]: new Set([TransactionState.REFUND_INITIATED, TransactionState.SETTLED]),
   [TransactionState.PARTIALLY_CAPTURED]: new Set([TransactionState.REFUND_INITIATED, TransactionState.SETTLED]),
   [TransactionState.CAPTURE_FAILED]: new Set([TransactionState.FAILED]),
-  [TransactionState.REFUND_INITIATED]: new Set([TransactionState.REFUNDED, TransactionState.PARTIALLY_REFUNDED, TransactionState.REFUND_FAILED]),
+  [TransactionState.REFUND_INITIATED]: new Set([
+    TransactionState.REFUNDED,
+    TransactionState.PARTIALLY_REFUNDED,
+    TransactionState.REFUND_FAILED,
+  ]),
   [TransactionState.REFUNDED]: new Set([TransactionState.SETTLED]),
   [TransactionState.PARTIALLY_REFUNDED]: new Set([TransactionState.REFUND_INITIATED, TransactionState.SETTLED]),
   [TransactionState.REFUND_FAILED]: new Set([TransactionState.REFUND_INITIATED]),
   [TransactionState.VOID_INITIATED]: new Set([TransactionState.VOIDED, TransactionState.FAILED]),
-  
+
   // Terminal States
   [TransactionState.VOIDED]: new Set(),
   [TransactionState.AUTH_EXPIRED]: new Set(),
@@ -37,36 +58,36 @@ const COMPENSATING_PATHS: Record<string, TransactionState[]> = {
     TransactionState.AUTH_INITIATED,
     TransactionState.AUTHORISED,
     TransactionState.CAPTURE_INITIATED,
-    TransactionState.CAPTURED
+    TransactionState.CAPTURED,
   ],
   // From ROUTE_SELECTED to CAPTURED
   [`${TransactionState.ROUTE_SELECTED}->${TransactionState.CAPTURED}`]: [
     TransactionState.AUTH_INITIATED,
     TransactionState.AUTHORISED,
     TransactionState.CAPTURE_INITIATED,
-    TransactionState.CAPTURED
+    TransactionState.CAPTURED,
   ],
   // From AUTH_INITIATED to CAPTURED
   [`${TransactionState.AUTH_INITIATED}->${TransactionState.CAPTURED}`]: [
     TransactionState.AUTHORISED,
     TransactionState.CAPTURE_INITIATED,
-    TransactionState.CAPTURED
+    TransactionState.CAPTURED,
   ],
   // From AUTHORISED to CAPTURED
   [`${TransactionState.AUTHORISED}->${TransactionState.CAPTURED}`]: [
     TransactionState.CAPTURE_INITIATED,
-    TransactionState.CAPTURED
+    TransactionState.CAPTURED,
   ],
   // From CREATED to AUTHORISED
   [`${TransactionState.CREATED}->${TransactionState.AUTHORISED}`]: [
     TransactionState.ROUTE_SELECTED,
     TransactionState.AUTH_INITIATED,
-    TransactionState.AUTHORISED
+    TransactionState.AUTHORISED,
   ],
   // From ROUTE_SELECTED to AUTHORISED
   [`${TransactionState.ROUTE_SELECTED}->${TransactionState.AUTHORISED}`]: [
     TransactionState.AUTH_INITIATED,
-    TransactionState.AUTHORISED
+    TransactionState.AUTHORISED,
   ],
 };
 
@@ -111,7 +132,17 @@ export class TransactionStateMachine {
 
     // 1. Direct Transition Check
     if (VALID_TRANSITIONS[currentState].has(targetState)) {
-      await this.executeSingleTransition(prisma, transactionId, currentState, targetState, gateway, actor, reason, metadata, traceId);
+      await this.executeSingleTransition(
+        prisma,
+        transactionId,
+        currentState,
+        targetState,
+        gateway,
+        actor,
+        reason,
+        metadata,
+        traceId
+      );
       return;
     }
 

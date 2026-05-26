@@ -9,7 +9,7 @@ export const metricsWorker = new Worker(
   'metrics-queue',
   async (job: Job) => {
     const traceId = job.data.traceId || 'metrics-cron-trace';
-    
+
     const store = new Map<string, string>();
     store.set('trace_id', traceId);
     store.set('action', 'metrics_worker');
@@ -20,7 +20,7 @@ export const metricsWorker = new Worker(
       try {
         // Query transactions in the last 1 hour
         const oneHourAgo = new Date(Date.now() - 3600 * 1000);
-        
+
         // Fetch all transactions from the last hour
         const transactions = await prisma.transaction.findMany({
           where: {
@@ -42,23 +42,23 @@ export const metricsWorker = new Worker(
 
         for (const [key, group] of Object.entries(groups)) {
           const [gatewayName, paymentMethod] = key.split(':');
-          
-          const total = group.length;
-          const successful = group.filter(tx => 
-            tx.status === 'CAPTURED' || tx.status === 'SETTLED' || tx.status === 'REFUNDED'
-          ).length;
-          const failed = group.filter(tx => tx.status === 'FAILED').length;
 
-          const successRate = total > 0 ? (successful / total) : 1.0;
-          const errorRate = total > 0 ? (failed / total) : 0.0;
+          const total = group.length;
+          const successful = group.filter(
+            (tx) => tx.status === 'CAPTURED' || tx.status === 'SETTLED' || tx.status === 'REFUNDED'
+          ).length;
+          const failed = group.filter((tx) => tx.status === 'FAILED').length;
+
+          const successRate = total > 0 ? successful / total : 1.0;
+          const errorRate = total > 0 ? failed / total : 0.0;
 
           // Latency Calculation:
           // Extract latency from transaction state logs (time diff between ROUTE_SELECTED and AUTH_INITIATED/AUTHORISED/CAPTURED)
           const latencies: number[] = [];
           for (const tx of group) {
-            const routeSelectedLog = tx.state_logs.find(l => l.to_state === 'ROUTE_SELECTED');
-            const authLog = tx.state_logs.find(l => 
-              l.to_state === 'AUTH_INITIATED' || l.to_state === 'AUTHORISED' || l.to_state === 'CAPTURED'
+            const routeSelectedLog = tx.state_logs.find((l) => l.to_state === 'ROUTE_SELECTED');
+            const authLog = tx.state_logs.find(
+              (l) => l.to_state === 'AUTH_INITIATED' || l.to_state === 'AUTHORISED' || l.to_state === 'CAPTURED'
             );
 
             if (routeSelectedLog && authLog) {
@@ -101,7 +101,7 @@ export const metricsWorker = new Worker(
             const redisKey = `cb:${gatewayName}:${paymentMethod}`;
             await redis.set(`${redisKey}:state`, metric.state);
             await redis.set(`${redisKey}:last_change`, metric.last_state_change.toISOString());
-            
+
             logger.info(`Updated metrics for ${gatewayName} - ${paymentMethod}`, {
               total_attempts: total,
               success_rate: successRate,

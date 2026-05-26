@@ -37,7 +37,7 @@ export class WebhookController {
   public static async replayWebhook(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { event_id } = req.params;
-      const traceId = res.getHeader('X-Trace-ID') as string || 'default-trace';
+      const traceId = (res.getHeader('X-Trace-ID') as string) || 'default-trace';
 
       const result = await WebhookService.replayWebhook(event_id, traceId);
       res.status(200).json(result);
@@ -50,16 +50,11 @@ export class WebhookController {
   /**
    * Base helper to receive, validate, and enqueue raw webhook events.
    */
-  private static async handleWebhook(
-    gateway: string,
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  private static async handleWebhook(gateway: string, req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const headers = req.headers as Record<string, string>;
-      const traceId = res.getHeader('X-Trace-ID') as string || 'default-trace';
-      
+      const traceId = (res.getHeader('X-Trace-ID') as string) || 'default-trace';
+
       // Read raw body stored by custom express.json verify hook
       const rawBody = (req as any).rawBody || JSON.stringify(req.body);
 

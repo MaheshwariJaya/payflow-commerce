@@ -30,9 +30,7 @@ export class WebhookService {
     }
 
     // Decrypt the webhook secret
-    const decryptSecret = await import('../utils/crypto.util').then((m) =>
-      m.CryptoUtil.decrypt(config.api_secret!)
-    );
+    const decryptSecret = await import('../utils/crypto.util').then((m) => m.CryptoUtil.decrypt(config.api_secret!));
 
     // 2. Validate webhook signature & timestamp protection
     const adapter = GatewayFactory.getAdapter(gateway);
@@ -99,10 +97,7 @@ export class WebhookService {
   /**
    * Replays a failed/dead webhook by re-enqueuing it.
    */
-  public static async replayWebhook(
-    eventId: string,
-    traceId: string
-  ): Promise<{ success: boolean; message: string }> {
+  public static async replayWebhook(eventId: string, traceId: string): Promise<{ success: boolean; message: string }> {
     // Check WebhookQueueLog or DeadLetterQueue
     const logItem = await prisma.webhookQueueLog.findFirst({
       where: { event_id: eventId },
@@ -143,7 +138,7 @@ export class WebhookService {
 
     // Enqueue again
     await QueueService.enqueueWebhook(gateway, eventId, payload, traceId);
-    
+
     logger.info(`Requeued webhook replay for ${gateway} - ${eventId}`, { trace_id: traceId });
     return { success: true, message: `Webhook ${eventId} successfully requeued for replay.` };
   }

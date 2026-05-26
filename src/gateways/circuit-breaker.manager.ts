@@ -3,7 +3,7 @@ import { redis } from '../config/redis';
 import { logger } from '../utils/logger';
 
 const COOLDOWN_PERIOD_MS = 30000; // 30 seconds
-const FAILURE_THRESHOLD = 5;      // Max failures before trip
+const FAILURE_THRESHOLD = 5; // Max failures before trip
 const CONSECUTIVE_SUCCESS_REQ = 3; // Successes in HALF_OPEN to close circuit
 
 export class CircuitBreakerManager {
@@ -18,9 +18,9 @@ export class CircuitBreakerManager {
     traceId: string
   ): Promise<boolean> {
     const key = `cb:${gatewayName}:${paymentMethod.toUpperCase()}`;
-    
+
     // 1. Read state from Redis cache
-    let state = await redis.get(`${key}:state`) as CircuitState | null;
+    let state = (await redis.get(`${key}:state`)) as CircuitState | null;
     let lastChangeStr = await redis.get(`${key}:last_change`);
 
     // 2. Cache miss: read from DB and populate cache
@@ -42,7 +42,14 @@ export class CircuitBreakerManager {
 
       state = metric.state;
       lastChangeStr = metric.last_state_change.toISOString();
-      await this.syncRedis(gatewayName, paymentMethod.toUpperCase(), state, metric.failure_count, metric.success_count, metric.last_state_change);
+      await this.syncRedis(
+        gatewayName,
+        paymentMethod.toUpperCase(),
+        state,
+        metric.failure_count,
+        metric.success_count,
+        metric.last_state_change
+      );
     }
 
     if (state === CircuitState.CLOSED || state === CircuitState.HALF_OPEN) {
@@ -59,7 +66,7 @@ export class CircuitBreakerManager {
       logger.info(`Circuit breaker cooldown elapsed. Transitioning ${gatewayName} - ${paymentMethod} to HALF_OPEN.`, {
         gateway: gatewayName,
         payment_method: paymentMethod,
-        trace_id: traceId
+        trace_id: traceId,
       });
 
       await this.updateState(gatewayName, paymentMethod.toUpperCase(), CircuitState.HALF_OPEN, prisma, traceId);
@@ -80,19 +87,19 @@ export class CircuitBreakerManager {
     traceId: string
   ): Promise<void> {
     const key = `cb:${gatewayName}:${paymentMethod.toUpperCase()}`;
-    const state = await redis.get(`${key}:state`) as CircuitState || CircuitState.CLOSED;
+    const state = ((await redis.get(`${key}:state`)) as CircuitState) || CircuitState.CLOSED;
 
     await redis.incr(`${key}:successes`);
     await redis.set(`${key}:failures`, '0'); // Reset failures on success
 
     if (state === CircuitState.HALF_OPEN) {
       const consecutiveSuccesses = await redis.incr(`${key}:consecutive_successes`);
-      
+
       if (consecutiveSuccesses >= CONSECUTIVE_SUCCESS_REQ) {
         logger.info(`Circuit closed for ${gatewayName} - ${paymentMethod} after consecutive successes.`, {
           gateway: gatewayName,
           payment_method: paymentMethod,
-          trace_id: traceId
+          trace_id: traceId,
         });
         await this.updateState(gatewayName, paymentMethod.toUpperCase(), CircuitState.CLOSED, prisma, traceId);
       }
@@ -113,7 +120,7 @@ export class CircuitBreakerManager {
     traceId: string
   ): Promise<void> {
     const key = `cb:${gatewayName}:${paymentMethod.toUpperCase()}`;
-    const state = await redis.get(`${key}:state`) as CircuitState || CircuitState.CLOSED;
+    const state = ((await redis.get(`${key}:state`)) as CircuitState) || CircuitState.CLOSED;
 
     const failures = await redis.incr(`${key}:failures`);
     await redis.set(`${key}:consecutive_successes`, '0'); // Reset consecutive successes
@@ -122,23 +129,26 @@ export class CircuitBreakerManager {
       gateway: gatewayName,
       payment_method: paymentMethod,
       error,
-      trace_id: traceId
+      trace_id: traceId,
     });
 
     if (state === CircuitState.HALF_OPEN) {
       // Any failure in HALF_OPEN trips it back to OPEN immediately
-      logger.error(`Circuit breaker failure in HALF_OPEN. Tripping back to OPEN for ${gatewayName} - ${paymentMethod}`, {
-        gateway: gatewayName,
-        payment_method: paymentMethod,
-        trace_id: traceId
-      });
+      logger.error(
+        `Circuit breaker failure in HALF_OPEN. Tripping back to OPEN for ${gatewayName} - ${paymentMethod}`,
+        {
+          gateway: gatewayName,
+          payment_method: paymentMethod,
+          trace_id: traceId,
+        }
+      );
       await this.updateState(gatewayName, paymentMethod.toUpperCase(), CircuitState.OPEN, prisma, traceId);
     } else if (state === CircuitState.CLOSED && failures >= FAILURE_THRESHOLD) {
       // Exceeded threshold in CLOSED state: trip to OPEN
       logger.error(`Circuit breaker tripped to OPEN for ${gatewayName} - ${paymentMethod}. Failures: ${failures}`, {
         gateway: gatewayName,
         payment_method: paymentMethod,
-        trace_id: traceId
+        trace_id: traceId,
       });
       await this.updateState(gatewayName, paymentMethod.toUpperCase(), CircuitState.OPEN, prisma, traceId);
     }
@@ -158,7 +168,7 @@ export class CircuitBreakerManager {
     traceId: string
   ): Promise<void> {
     const now = new Date();
-    
+
     // Sync Redis
     await redis.set(`cb:${gatewayName}:${paymentMethod}:state`, newState);
     await redis.set(`cb:${gatewayName}:${paymentMethod}:last_change`, now.toISOString());
@@ -185,7 +195,7 @@ export class CircuitBreakerManager {
       gateway: gatewayName,
       payment_method: paymentMethod,
       newState,
-      trace_id: traceId
+      trace_id: traceId,
     });
   }
 
@@ -232,13 +242,13 @@ export class CircuitBreakerManager {
       const totalAttempts = metric.success_count + metric.failure_count + 1;
       const successCount = metric.success_count + (isSuccess ? 1 : 0);
       const failureCount = metric.failure_count + (isSuccess ? 0 : 1);
-      
+
       const successRate = successCount / totalAttempts;
-      
+
       let avgLatency = metric.avg_latency_ms;
       if (isSuccess && latencyMs > 0) {
         // Rolling average (weighted 0.9 old, 0.1 new)
-        avgLatency = (metric.avg_latency_ms * 0.9) + (latencyMs * 0.1);
+        avgLatency = metric.avg_latency_ms * 0.9 + latencyMs * 0.1;
       }
 
       await prisma.gatewayHealthMetrics.update({

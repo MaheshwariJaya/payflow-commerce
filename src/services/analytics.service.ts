@@ -8,14 +8,14 @@ export class AnalyticsService {
    */
   public static async getSuccessRates(): Promise<any> {
     const successStates = [TransactionState.CAPTURED, TransactionState.SETTLED, TransactionState.REFUNDED];
-    
+
     // Global metrics
     const totalTransactions = await prisma.transaction.count();
     const successfulTransactions = await prisma.transaction.count({
       where: { status: { in: successStates } },
     });
 
-    const globalSuccessRate = totalTransactions > 0 ? (successfulTransactions / totalTransactions) : 1.0;
+    const globalSuccessRate = totalTransactions > 0 ? successfulTransactions / totalTransactions : 1.0;
 
     // Per-Gateway metrics
     const gatewayGroup = await prisma.transaction.groupBy({

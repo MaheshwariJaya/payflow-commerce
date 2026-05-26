@@ -43,7 +43,7 @@ export class RazorpayAdapter implements IGatewayAdapter {
     }
 
     const gatewayRef = `pay_${transactionId}`;
-    
+
     // Trigger webhook asynchronously
     const actualDelay = trigger.scenario === 'DELAYED_WEBHOOK' ? 8000 : 500;
     const webhookStatus = trigger.scenario === ('AUTH_ONLY' as any) ? 'authorised' : 'captured';
@@ -107,11 +107,7 @@ export class RazorpayAdapter implements IGatewayAdapter {
     };
   }
 
-  public async voidPayment(
-    transactionId: string,
-    gatewayRefId: string,
-    traceId: string
-  ): Promise<GatewayResponse> {
+  public async voidPayment(transactionId: string, gatewayRefId: string, traceId: string): Promise<GatewayResponse> {
     return {
       success: true,
       gatewayReferenceId: gatewayRefId,
@@ -123,11 +119,7 @@ export class RazorpayAdapter implements IGatewayAdapter {
     };
   }
 
-  public verifyWebhookSignature(
-    headers: Record<string, string>,
-    rawBody: string,
-    secret: string
-  ): boolean {
+  public verifyWebhookSignature(headers: Record<string, string>, rawBody: string, secret: string): boolean {
     try {
       const razorpaySig = headers['x-razorpay-signature'] || headers['X-Razorpay-Signature'];
       if (!razorpaySig) {
@@ -164,9 +156,9 @@ export class RazorpayAdapter implements IGatewayAdapter {
   public parseWebhookEvent(body: any): ParsedWebhookEvent {
     const eventType = body.event;
     const paymentEntity = body.payload.payment.entity;
-    
+
     const transactionId = paymentEntity.notes?.transaction_id || paymentEntity.id.replace('pay_', '');
-    
+
     let status: 'authorised' | 'captured' | 'failed' | 'refunded' = 'captured';
     if (eventType === 'payment.failed') {
       status = 'failed';

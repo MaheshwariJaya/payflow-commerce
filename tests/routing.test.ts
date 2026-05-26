@@ -90,13 +90,7 @@ describe('Routing Engine Scoring Tests', () => {
   });
 
   test('Should filter out gateways that do not support the requested method', async () => {
-    const routes = await RoutingEngine.selectRoute(
-      mockPrisma,
-      BigInt(10000),
-      'INR',
-      'UPI',
-      'test-trace-id'
-    );
+    const routes = await RoutingEngine.selectRoute(mockPrisma, BigInt(10000), 'INR', 'UPI', 'test-trace-id');
 
     // Only Razorpay supports UPI in our mocked config
     expect(routes.length).toBe(1);
@@ -122,13 +116,7 @@ describe('Routing Engine Scoring Tests', () => {
       },
     ]);
 
-    const routes = await RoutingEngine.selectRoute(
-      mockPrisma,
-      BigInt(10000),
-      'INR',
-      'CARD',
-      'test-trace-id'
-    );
+    const routes = await RoutingEngine.selectRoute(mockPrisma, BigInt(10000), 'INR', 'CARD', 'test-trace-id');
 
     // Stripe should now be first because Razorpay is OPEN
     expect(routes[0].gatewayName).toBe('Stripe');

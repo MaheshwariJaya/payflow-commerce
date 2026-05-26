@@ -43,7 +43,7 @@ export class UPIAdapter implements IGatewayAdapter {
     }
 
     const gatewayRef = `upi_${transactionId}`;
-    
+
     // Trigger webhook asynchronously
     const actualDelay = trigger.scenario === 'DELAYED_WEBHOOK' ? 8000 : 500;
     SimulatorService.triggerAsynchronousWebhook(
@@ -104,11 +104,7 @@ export class UPIAdapter implements IGatewayAdapter {
     };
   }
 
-  public async voidPayment(
-    transactionId: string,
-    gatewayRefId: string,
-    traceId: string
-  ): Promise<GatewayResponse> {
+  public async voidPayment(transactionId: string, gatewayRefId: string, traceId: string): Promise<GatewayResponse> {
     return {
       success: true,
       gatewayReferenceId: gatewayRefId,
@@ -119,16 +115,12 @@ export class UPIAdapter implements IGatewayAdapter {
     };
   }
 
-  public verifyWebhookSignature(
-    headers: Record<string, string>,
-    rawBody: string,
-    secret: string
-  ): boolean {
+  public verifyWebhookSignature(headers: Record<string, string>, rawBody: string, secret: string): boolean {
     try {
       const upiSig = headers['x-upi-signature'] || headers['X-Upi-Signature'];
       const fallbackSig = headers['x-webhook-signature'] || headers['X-Webhook-Signature'];
       const signatureToVerify = upiSig || fallbackSig;
-      
+
       if (!signatureToVerify) return false;
 
       // Recompute Signature

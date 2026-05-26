@@ -17,7 +17,7 @@ export interface ParsedWebhookEvent {
 
 export interface IGatewayAdapter {
   name: string;
-  
+
   initializePayment(
     transactionId: string,
     amountPaise: bigint,
@@ -42,17 +42,9 @@ export interface IGatewayAdapter {
     traceId: string
   ): Promise<GatewayResponse>;
 
-  voidPayment(
-    transactionId: string,
-    gatewayRefId: string,
-    traceId: string
-  ): Promise<GatewayResponse>;
+  voidPayment(transactionId: string, gatewayRefId: string, traceId: string): Promise<GatewayResponse>;
 
-  verifyWebhookSignature(
-    headers: Record<string, string>,
-    rawBody: string,
-    secret: string
-  ): boolean;
+  verifyWebhookSignature(headers: Record<string, string>, rawBody: string, secret: string): boolean;
 
   parseWebhookEvent(body: any): ParsedWebhookEvent;
 }

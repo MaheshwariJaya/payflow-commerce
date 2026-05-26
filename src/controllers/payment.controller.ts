@@ -14,12 +14,13 @@ export class PaymentController {
     try {
       const { amount_paise, currency, payment_method, customer_id, merchant_order_id, metadata } = req.body;
       const idempotencyKey = req.headers['idempotency-key'] as string;
-      const traceId = res.getHeader('X-Trace-ID') as string || 'default-trace';
+      const traceId = (res.getHeader('X-Trace-ID') as string) || 'default-trace';
 
       if (!amount_paise || !currency || !payment_method || !customer_id || !merchant_order_id) {
         res.status(400).json({
           error: 'Bad Request',
-          message: 'Missing required request body parameters: amount_paise, currency, payment_method, customer_id, merchant_order_id',
+          message:
+            'Missing required request body parameters: amount_paise, currency, payment_method, customer_id, merchant_order_id',
         });
         return;
       }
@@ -60,7 +61,7 @@ export class PaymentController {
   public static async getPaymentDetails(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      
+
       const transaction = await prisma.transaction.findUnique({
         where: { id },
         include: { refunds: true },
@@ -84,7 +85,7 @@ export class PaymentController {
     try {
       const { id } = req.params;
       const { amount_paise } = req.body;
-      const traceId = res.getHeader('X-Trace-ID') as string || 'default-trace';
+      const traceId = (res.getHeader('X-Trace-ID') as string) || 'default-trace';
 
       if (!amount_paise) {
         res.status(400).json({ error: 'Bad Request', message: 'Missing required parameter: amount_paise' });
@@ -114,7 +115,7 @@ export class PaymentController {
     try {
       const { id } = req.params;
       const { amount_paise, reason } = req.body;
-      const traceId = res.getHeader('X-Trace-ID') as string || 'default-trace';
+      const traceId = (res.getHeader('X-Trace-ID') as string) || 'default-trace';
 
       if (!amount_paise || !reason) {
         res.status(400).json({ error: 'Bad Request', message: 'Missing required parameters: amount_paise, reason' });
@@ -143,7 +144,7 @@ export class PaymentController {
   public static async voidPayment(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      const traceId = res.getHeader('X-Trace-ID') as string || 'default-trace';
+      const traceId = (res.getHeader('X-Trace-ID') as string) || 'default-trace';
 
       const transaction = await PaymentService.voidPayment(id, traceId);
       res.status(200).json(serializeBigInt(transaction));
@@ -186,4 +187,3 @@ export class PaymentController {
     }
   }
 }
-

@@ -40,19 +40,20 @@ app.use((req, res, next) => {
   res.json = function (body: any) {
     if (body && typeof body === 'object' && body.error && !body.error.code) {
       const rawError = body.error;
-      const code = typeof rawError === 'string'
-        ? rawError.toUpperCase().replace(/[^A-Z0-9_]/g, '_')
-        : (body.code || 'INTERNAL_SERVER_ERROR');
-      
+      const code =
+        typeof rawError === 'string'
+          ? rawError.toUpperCase().replace(/[^A-Z0-9_]/g, '_')
+          : body.code || 'INTERNAL_SERVER_ERROR';
+
       const message = body.message || (typeof rawError === 'string' ? rawError : 'An error occurred');
       const details = body.details || (body.statusCode ? { statusCode: body.statusCode } : {});
-      
+
       body = {
         error: {
           code,
           message,
           details,
-        }
+        },
       };
     }
     return originalJson.call(this, body);
@@ -74,7 +75,7 @@ app.post('/api/v1/auth/token', (req, res) => {
     res.status(400).json({ error: 'Bad Request', message: 'Missing customer_id parameter in body' });
     return;
   }
-  
+
   const token = jwt.sign(
     { customer_id, scope: 'transactions:write' },
     process.env.JWT_SECRET || 'supersecretjwtkeyforpayflow',
@@ -104,7 +105,6 @@ app.use('/dashboard', express.static('public'));
 // 8. Swagger Documentation UI
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openapiSpec));
 
-
 // 8. Prometheus Metrics Endpoint
 app.get('/metrics', async (req, res) => {
   try {
@@ -128,7 +128,7 @@ app.get('/api/v1/health', (req, res) => {
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   const status = err.statusCode || err.status || 500;
   const message = err.message || 'Internal Server Error';
-  
+
   logger.error('Unhandled request exception', {
     error: message,
     stack: err.stack,

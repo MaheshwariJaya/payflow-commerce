@@ -29,10 +29,7 @@ export async function withTimeout<T>(
   });
 
   try {
-    const result = await Promise.race([
-      promiseFactory(signal),
-      timeoutPromise,
-    ]);
+    const result = await Promise.race([promiseFactory(signal), timeoutPromise]);
     return result;
   } finally {
     if (timeoutId) {

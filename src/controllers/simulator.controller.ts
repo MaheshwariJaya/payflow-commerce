@@ -11,7 +11,7 @@ export class SimulatorController {
     const { amount, currency, metadata } = req.body;
     const txId = metadata?.transaction_id || `sim_${crypto.randomUUID()}`;
     const orderId = req.body.description || '';
-    
+
     const trigger = SimulatorService.parseTrigger('Stripe', orderId, metadata);
     logger.info('Simulator: Stripe payment request received', { trigger });
 
@@ -34,7 +34,7 @@ export class SimulatorController {
 
     // Success response
     const ref = `pi_${txId}`;
-    
+
     // Fire callback webhook after 500ms
     const stripeWebhookStatus = trigger.scenario === ('AUTH_ONLY' as any) ? 'authorised' : 'captured';
     SimulatorService.triggerAsynchronousWebhook(
@@ -64,7 +64,7 @@ export class SimulatorController {
     const { amount, currency, notes } = req.body;
     const txId = notes?.transaction_id || `sim_${crypto.randomUUID()}`;
     const orderId = notes?.merchant_order_id || '';
-    
+
     const trigger = SimulatorService.parseTrigger('Razorpay', orderId, notes);
     logger.info('Simulator: Razorpay order request received', { trigger });
 

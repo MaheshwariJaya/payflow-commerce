@@ -15,7 +15,10 @@ export class SimulatorService {
     const g = gateway.toUpperCase();
 
     const matches = (scenario: string) => {
-      return checkStr.includes(`SIM_${scenario}_${g}`) || (checkStr.includes(`SIM_${scenario}`) && !checkStr.includes(`SIM_${scenario}_`));
+      return (
+        checkStr.includes(`SIM_${scenario}_${g}`) ||
+        (checkStr.includes(`SIM_${scenario}`) && !checkStr.includes(`SIM_${scenario}_`))
+      );
     };
 
     if (matches('TIMEOUT')) {
@@ -124,23 +127,29 @@ export class SimulatorService {
     status: 'captured' | 'failed' | 'authorised'
   ): any {
     const amtStr = amountPaise.toString();
-    
+
     if (gateway.toLowerCase() === 'stripe') {
       return {
         id: eventId,
         object: 'event',
-        type: status === 'captured'
-          ? 'payment_intent.succeeded'
-          : (status === 'authorised' ? 'payment_intent.amount_capturable_updated' : 'payment_intent.payment_failed'),
+        type:
+          status === 'captured'
+            ? 'payment_intent.succeeded'
+            : status === 'authorised'
+              ? 'payment_intent.amount_capturable_updated'
+              : 'payment_intent.payment_failed',
         created: Math.floor(Date.now() / 1000),
         data: {
           object: {
             id: `pi_${transactionId}`,
             amount: Number(amountPaise) / 100, // Stripe uses cents/dollars
             currency: currency.toLowerCase(),
-            status: status === 'captured'
-              ? 'succeeded'
-              : (status === 'authorised' ? 'requires_capture' : 'requires_payment_method'),
+            status:
+              status === 'captured'
+                ? 'succeeded'
+                : status === 'authorised'
+                  ? 'requires_capture'
+                  : 'requires_payment_method',
             metadata: {
               transaction_id: transactionId,
             },
@@ -153,18 +162,19 @@ export class SimulatorService {
       return {
         entity: 'event',
         account_id: 'acc_12345',
-        event: status === 'captured'
-          ? 'payment.captured'
-          : (status === 'authorised' ? 'payment.authorized' : 'payment.failed'),
+        event:
+          status === 'captured'
+            ? 'payment.captured'
+            : status === 'authorised'
+              ? 'payment.authorized'
+              : 'payment.failed',
         payload: {
           payment: {
             entity: {
               id: `pay_${transactionId}`,
               amount: Number(amountPaise), // Razorpay uses paise
               currency: currency,
-              status: status === 'captured'
-                ? 'captured'
-                : (status === 'authorised' ? 'authorized' : 'failed'),
+              status: status === 'captured' ? 'captured' : status === 'authorised' ? 'authorized' : 'failed',
               order_id: `order_${transactionId}`,
               notes: {
                 transaction_id: transactionId,

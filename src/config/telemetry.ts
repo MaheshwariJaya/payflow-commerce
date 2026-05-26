@@ -51,7 +51,7 @@ export const gatewayCircuitGauge = new promClient.Gauge({
  */
 export function telemetryMiddleware(req: Request, res: Response, next: NextFunction): void {
   const start = process.hrtime();
-  
+
   res.on('finish', () => {
     const duration = process.hrtime(start);
     const durationInSeconds = duration[0] + duration[1] / 1e9;
@@ -83,7 +83,11 @@ export function startTelemetry() {
 /**
  * Helper to run a synchronous or async block inside an OTel trace span.
  */
-export async function runInSpan<T>(spanName: string, attributes: Record<string, string>, fn: () => Promise<T>): Promise<T> {
+export async function runInSpan<T>(
+  spanName: string,
+  attributes: Record<string, string>,
+  fn: () => Promise<T>
+): Promise<T> {
   const tracer = trace.getTracer('payflow-tracer');
   return tracer.startActiveSpan(spanName, async (span) => {
     try {

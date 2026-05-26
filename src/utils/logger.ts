@@ -28,7 +28,7 @@ function log(level: 'info' | 'warn' | 'error' | 'debug', msg: string, metadata?:
   const transactionId = store?.get('transaction_id');
   const gateway = store?.get('gateway');
   const action = store?.get('action');
-  
+
   const mergedMetadata = {
     trace_id: traceId || metadata?.trace_id,
     transaction_id: transactionId || metadata?.transaction_id,
@@ -58,4 +58,3 @@ export function setLogContext(key: string, value: string) {
     store.set(key, value);
   }
 }
-

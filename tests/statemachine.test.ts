@@ -22,7 +22,9 @@ describe('Transaction State Machine Tests', () => {
         create: jest.fn().mockResolvedValue({}),
       },
       // Mock $queryRaw to return a transaction in CREATED state by default
-      $queryRaw: jest.fn().mockResolvedValue([{ id: 'mock-tx-uuid', status: TransactionState.CREATED, gateway_name: 'Stripe' }]),
+      $queryRaw: jest
+        .fn()
+        .mockResolvedValue([{ id: 'mock-tx-uuid', status: TransactionState.CREATED, gateway_name: 'Stripe' }]),
     };
   });
 
@@ -50,7 +52,9 @@ describe('Transaction State Machine Tests', () => {
   test('Should reject illegal direct transitions (CREATED -> CAPTURED)', async () => {
     // If not in compensating list or direct list
     // Let's set initial state to CAPTURE_FAILED (which cannot transition to AUTHORISED)
-    mockPrisma.$queryRaw = jest.fn().mockResolvedValue([{ id: 'mock-tx-uuid', status: TransactionState.CAPTURE_FAILED, gateway_name: 'Stripe' }]);
+    mockPrisma.$queryRaw = jest
+      .fn()
+      .mockResolvedValue([{ id: 'mock-tx-uuid', status: TransactionState.CAPTURE_FAILED, gateway_name: 'Stripe' }]);
 
     await expect(
       TransactionStateMachine.transition(

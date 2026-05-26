@@ -7,7 +7,7 @@ const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 
 export const redisConnectionOptions = {
   maxRetriesPerRequest: null, // Required by BullMQ
-  enableReadyCheck: false
+  enableReadyCheck: false,
 };
 
 // Main Redis Client for Cache, Circuit Breaker, and Rate Limiter

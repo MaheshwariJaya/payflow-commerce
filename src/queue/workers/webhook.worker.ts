@@ -11,7 +11,7 @@ export const webhookWorker = new Worker(
   'webhook-queue',
   async (job: Job) => {
     const { gateway, eventId, payload, traceId } = job.data;
-    
+
     // Set up AsyncLocalStorage trace logging context inside the worker execution thread
     const store = new Map<string, string>();
     store.set('trace_id', traceId);
@@ -45,7 +45,7 @@ export const webhookWorker = new Worker(
         const adapter = GatewayFactory.getAdapter(gateway);
         const parsedEvent = adapter.parseWebhookEvent(payload);
         const transactionId = parsedEvent.transactionId;
-        
+
         store.set('transaction_id', transactionId);
 
         // Find Transaction in DB
@@ -68,7 +68,7 @@ export const webhookWorker = new Worker(
               notes: `Orphaned webhook received for event_id=${eventId}. Tx reference ID=${transactionId} does not exist locally.`,
             },
           });
-          
+
           await updateQueueLog(eventId, WebhookStatus.FAILED, msg);
           throw new Error(msg);
         }
@@ -114,9 +114,9 @@ export const webhookWorker = new Worker(
         return { status: 'success' };
       } catch (err: any) {
         logger.error(`Webhook processing worker exception`, { error: err.message, event_id: eventId });
-        
+
         const isFinalAttempt = (job.attemptsMade || 0) >= (job.opts.attempts || 5) - 1;
-        
+
         if (isFinalAttempt) {
           // Put in DLQ database table
           await prisma.deadLetterQueue.create({

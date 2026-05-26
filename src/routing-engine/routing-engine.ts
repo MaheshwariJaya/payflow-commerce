@@ -31,7 +31,7 @@ export class RoutingEngine {
 
     // Filter gateways that support the payment method
     const candidates = gateways.filter((gw) =>
-      gw.supported_methods.map(m => m.toUpperCase()).includes(paymentMethod.toUpperCase())
+      gw.supported_methods.map((m) => m.toUpperCase()).includes(paymentMethod.toUpperCase())
     );
 
     if (candidates.length === 0) {
@@ -53,7 +53,7 @@ export class RoutingEngine {
       priority_matrix,
     } = routingConfig;
 
-    logger.info("Routing weights fetched in selectRoute:", { wSuccess, wLatency, wCost, wHealth, wFit });
+    logger.info('Routing weights fetched in selectRoute:', { wSuccess, wLatency, wCost, wHealth, wFit });
 
     // 3. Fetch health metrics for the candidates
     const healthMetricsList = await prisma.gatewayHealthMetrics.findMany({
@@ -71,14 +71,14 @@ export class RoutingEngine {
     // 4. Calculate raw metrics for all candidates
     const candidateData = candidates.map((gw) => {
       const metric = metricsMap.get(gw.name);
-      
+
       const successRate = metric ? metric.success_rate : gw.success_rate;
       const latency = metric ? metric.avg_latency_ms : gw.avg_latency_ms;
       const circuitState = metric ? metric.state : CircuitState.CLOSED;
 
       // Estimate transaction cost: cost_per_tx_paise + (cost_percentage * amount_paise)
       // Represent cost in paise (can be float or bigint, we'll use bigint or float for normalized calculation)
-      const costEstimate = Number(gw.cost_per_tx_paise) + (gw.cost_percentage * Number(amountPaise));
+      const costEstimate = Number(gw.cost_per_tx_paise) + gw.cost_percentage * Number(amountPaise);
 
       // Gateway health multiplier
       let healthMultiplier = 1.0;
@@ -94,7 +94,7 @@ export class RoutingEngine {
       if (Array.isArray(priorityList)) {
         const index = priorityList.indexOf(gw.name);
         if (index !== -1) {
-          fitScore = 1.0 - (index / priorityList.length);
+          fitScore = 1.0 - index / priorityList.length;
         }
       }
 
@@ -132,11 +132,11 @@ export class RoutingEngine {
 
       // Routing engine score formula
       const score =
-        (wSuccess * data.successRate) +
-        (wLatency * latencyScore) +
-        (wCost * costScore) +
-        (wHealth * data.healthMultiplier) +
-        (wFit * data.fitScore);
+        wSuccess * data.successRate +
+        wLatency * latencyScore +
+        wCost * costScore +
+        wHealth * data.healthMultiplier +
+        wFit * data.fitScore;
 
       return {
         gatewayName: data.gateway.name,
@@ -161,14 +161,14 @@ export class RoutingEngine {
 
     logger.info(`Computed gateway routing scores for ${paymentMethod}`, {
       paymentMethod,
-      options: sortedOptions.map(o => ({
+      options: sortedOptions.map((o) => ({
         gateway: o.gatewayName,
         score: o.score,
         circuitState: o.circuitState,
         latencyMs: o.avgLatencyMs,
-        costPaise: o.costEstimatePaise.toString()
+        costPaise: o.costEstimatePaise.toString(),
       })),
-      trace_id: traceId
+      trace_id: traceId,
     });
 
     return sortedOptions;

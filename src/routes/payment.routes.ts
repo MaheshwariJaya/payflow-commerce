@@ -17,4 +17,3 @@ router.post('/:id/void', PaymentController.voidPayment);
 router.get('/:id/timeline', PaymentController.getTimeline);
 
 export default router;
-

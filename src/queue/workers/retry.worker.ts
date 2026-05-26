@@ -53,7 +53,7 @@ export const retryWorker = new Worker(
         // We re-evaluate routing engine dynamically to route to a healthy gateway
         // Let's implement retry routing
         const routes = await RoutingEngineRetryHelper.retryRouting(tx, traceId);
-        
+
         if (routes.success) {
           logger.info(`Retry attempt succeeded for transaction ${transactionId}`);
         } else {
@@ -61,7 +61,7 @@ export const retryWorker = new Worker(
           const updatedTx = await prisma.transaction.findUnique({
             where: { id: transactionId },
           });
-          
+
           if (updatedTx && updatedTx.retry_count < 3) {
             await scheduleNextRetry(transactionId, updatedTx.retry_count, traceId);
           }
@@ -94,11 +94,7 @@ async function scheduleNextRetry(transactionId: string, retryCount: number, trac
   });
 
   const { retryQueue } = await import('../queue.service');
-  await retryQueue.add(
-    'retry-payment',
-    { transactionId, traceId },
-    { delay: totalDelay }
-  );
+  await retryQueue.add('retry-payment', { transactionId, traceId }, { delay: totalDelay });
 
   logger.info(`Scheduled next retry attempt in ${totalDelay}ms (at ${nextRetryAt.toISOString()})`, {
     transaction_id: transactionId,
@@ -114,13 +110,13 @@ class RoutingEngineRetryHelper {
     const { CircuitBreakerManager } = await import('../../gateways/circuit-breaker.manager');
     const { TransactionStateMachine } = await import('../../state-machine/transaction-state-machine');
     const { withTimeout } = await import('../../utils/timeout.util');
-    
+
     try {
       const routes = await RoutingEngine.selectRoute(prisma, tx.amount_paise, tx.currency, tx.payment_method, traceId);
-      
+
       for (const route of routes) {
         const gatewayName = route.gatewayName;
-        
+
         // Check limits and circuit
         const hasTokens = await GatewayRateLimiter.tryAcquire(gatewayName);
         if (!hasTokens) continue;
@@ -150,15 +146,16 @@ class RoutingEngineRetryHelper {
           const startTime = Date.now();
 
           const response = await withTimeout(
-            async () => adapter.initializePayment(
-              tx.id,
-              tx.amount_paise,
-              tx.currency,
-              tx.payment_method,
-              tx.merchant_order_id,
-              tx.metadata,
-              traceId
-            ),
+            async () =>
+              adapter.initializePayment(
+                tx.id,
+                tx.amount_paise,
+                tx.currency,
+                tx.payment_method,
+                tx.merchant_order_id,
+                tx.metadata,
+                traceId
+              ),
             2000,
             `Retry Gateway: ${gatewayName}`
           );
@@ -167,14 +164,15 @@ class RoutingEngineRetryHelper {
 
           if (response.success && response.gatewayReferenceId) {
             await CircuitBreakerManager.recordSuccess(gatewayName, tx.payment_method, latency, prisma, traceId);
-            
+
             await prisma.$transaction(async (txPrisma) => {
               await txPrisma.transaction.update({
                 where: { id: tx.id },
                 data: { gateway_reference_id: response.gatewayReferenceId },
               });
 
-              const nextState = response.status === 'captured' ? TransactionState.CAPTURED : TransactionState.AUTH_INITIATED;
+              const nextState =
+                response.status === 'captured' ? TransactionState.CAPTURED : TransactionState.AUTH_INITIATED;
               await TransactionStateMachine.transition(
                 txPrisma,
                 tx.id,
@@ -185,10 +183,16 @@ class RoutingEngineRetryHelper {
                 traceId
               );
             });
-            
+
             return { success: true };
           } else {
-            await CircuitBreakerManager.recordFailure(gatewayName, tx.payment_method, response.error || 'Retry gateway error', prisma, traceId);
+            await CircuitBreakerManager.recordFailure(
+              gatewayName,
+              tx.payment_method,
+              response.error || 'Retry gateway error',
+              prisma,
+              traceId
+            );
           }
         } catch (e: any) {
           await CircuitBreakerManager.recordFailure(gatewayName, tx.payment_method, e.message, prisma, traceId);

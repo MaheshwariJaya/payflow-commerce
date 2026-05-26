@@ -14,7 +14,7 @@ export class ConfigController {
   public static async getGateways(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const gateways = await prisma.gatewayConfig.findMany({});
-      
+
       // Mask credentials for security
       const sanitized = gateways.map((gw) => ({
         ...gw,
@@ -82,7 +82,17 @@ export class ConfigController {
   public static async updateGatewayConfig(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { name } = req.params;
-      const { is_active, base_url, api_key, api_secret, supported_methods, cost_per_tx_paise, cost_percentage, rate_limit_capacity, rate_limit_refill } = req.body;
+      const {
+        is_active,
+        base_url,
+        api_key,
+        api_secret,
+        supported_methods,
+        cost_per_tx_paise,
+        cost_percentage,
+        rate_limit_capacity,
+        rate_limit_refill,
+      } = req.body;
 
       const existing = await prisma.gatewayConfig.findFirst({
         where: { name: { equals: name, mode: 'insensitive' } },
@@ -98,7 +108,7 @@ export class ConfigController {
       if (base_url !== undefined) updateData.base_url = base_url;
       if (supported_methods !== undefined) updateData.supported_methods = supported_methods;
       if (cost_percentage !== undefined) updateData.cost_percentage = cost_percentage;
-      
+
       if (cost_per_tx_paise !== undefined) {
         updateData.cost_per_tx_paise = BigInt(cost_per_tx_paise);
       }
@@ -123,11 +133,13 @@ export class ConfigController {
 
       logger.info(`Updated gateway config for ${updated.name}`, { updated_by: 'admin' });
 
-      res.status(200).json(serializeBigInt({
-        ...updated,
-        api_key: '[MASKED]',
-        api_secret: updated.api_secret ? '[MASKED]' : null,
-      }));
+      res.status(200).json(
+        serializeBigInt({
+          ...updated,
+          api_key: '[MASKED]',
+          api_secret: updated.api_secret ? '[MASKED]' : null,
+        })
+      );
     } catch (err: any) {
       logger.error(`Failed to update config for ${req.params.name}`, { error: err.message });
       next(err);
@@ -151,10 +163,17 @@ export class ConfigController {
    */
   public static async updateRoutingConfig(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { success_rate_weight, latency_weight, cost_weight, health_weight, payment_method_fit_weight, priority_matrix } = req.body;
+      const {
+        success_rate_weight,
+        latency_weight,
+        cost_weight,
+        health_weight,
+        payment_method_fit_weight,
+        priority_matrix,
+      } = req.body;
 
       const existing = await prisma.routingConfig.findFirst();
-      
+
       const data = {
         success_rate_weight,
         latency_weight,

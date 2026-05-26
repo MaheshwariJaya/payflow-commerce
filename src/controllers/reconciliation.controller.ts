@@ -12,10 +12,10 @@ export class ReconciliationController {
    */
   public static async triggerReconciliation(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const traceId = res.getHeader('X-Trace-ID') as string || 'default-trace';
-      
+      const traceId = (res.getHeader('X-Trace-ID') as string) || 'default-trace';
+
       const count = await ReconciliationService.triggerBulkReconciliation(traceId);
-      
+
       logger.info(`Bulk reconciliation run triggered`, { enqueued_jobs_count: count });
       res.status(202).json({
         message: 'Bulk reconciliation processing triggered successfully.',

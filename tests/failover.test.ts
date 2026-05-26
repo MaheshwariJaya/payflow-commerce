@@ -86,7 +86,6 @@ describe('Orchestration Failover & Timeout Tests', () => {
     (CircuitBreakerManager.isAvailable as jest.Mock).mockResolvedValue(true);
   });
 
-
   test('Should failover to Razorpay when Stripe times out', async () => {
     // 1. Mock Routing Engine to return Stripe first, then Razorpay
     (RoutingEngine.selectRoute as jest.Mock).mockResolvedValue([

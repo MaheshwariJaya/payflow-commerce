@@ -8,7 +8,6 @@ import { withTimeout } from '../utils/timeout.util';
 import { QueueService } from '../queue/queue.service';
 import { logger, setLogContext } from '../utils/logger';
 
-
 const prisma = new PrismaClient();
 
 export class PaymentService {
@@ -144,15 +143,7 @@ export class PaymentService {
         // Wrap execution in 2-second timeout
         const gatewayResponse = await withTimeout(
           async () =>
-            adapter.initializePayment(
-              tx.id,
-              amountPaise,
-              currency,
-              paymentMethod,
-              merchantOrderId,
-              metadata,
-              traceId
-            ),
+            adapter.initializePayment(tx.id, amountPaise, currency, paymentMethod, merchantOrderId, metadata, traceId),
           2000,
           `Gateway: ${gatewayName} initialize`
         );
@@ -172,9 +163,7 @@ export class PaymentService {
             });
 
             const nextState =
-              gatewayResponse.status === 'captured'
-                ? TransactionState.CAPTURED
-                : TransactionState.AUTH_INITIATED;
+              gatewayResponse.status === 'captured' ? TransactionState.CAPTURED : TransactionState.AUTH_INITIATED;
 
             await TransactionStateMachine.transition(
               txPrisma,
@@ -257,7 +246,7 @@ export class PaymentService {
     traceId: string
   ): Promise<Transaction> {
     setLogContext('transaction_id', transactionId);
-    
+
     return await prisma.$transaction(async (txPrisma) => {
       const tx = await txPrisma.transaction.findUnique({
         where: { id: transactionId },
@@ -291,18 +280,11 @@ export class PaymentService {
       const adapter = GatewayFactory.getAdapter(tx.gateway_name);
 
       try {
-        const response = await adapter.capturePayment(
-          transactionId,
-          tx.gateway_reference_id,
-          amountPaise,
-          traceId
-        );
+        const response = await adapter.capturePayment(transactionId, tx.gateway_reference_id, amountPaise, traceId);
 
         if (response.success) {
           const finalState =
-            amountPaise < tx.amount_paise
-              ? TransactionState.PARTIALLY_CAPTURED
-              : TransactionState.CAPTURED;
+            amountPaise < tx.amount_paise ? TransactionState.PARTIALLY_CAPTURED : TransactionState.CAPTURED;
 
           const updated = await txPrisma.transaction.update({
             where: { id: transactionId },
@@ -365,8 +347,14 @@ export class PaymentService {
         throw new Error('Transaction not found');
       }
 
-      if (tx.status !== TransactionState.CAPTURED && tx.status !== TransactionState.SETTLED && tx.status !== TransactionState.PARTIALLY_REFUNDED) {
-        throw new Error(`Cannot refund transaction in status: ${tx.status}. Must be CAPTURED, SETTLED, or PARTIALLY_REFUNDED.`);
+      if (
+        tx.status !== TransactionState.CAPTURED &&
+        tx.status !== TransactionState.SETTLED &&
+        tx.status !== TransactionState.PARTIALLY_REFUNDED
+      ) {
+        throw new Error(
+          `Cannot refund transaction in status: ${tx.status}. Must be CAPTURED, SETTLED, or PARTIALLY_REFUNDED.`
+        );
       }
 
       if (!tx.gateway_name || !tx.gateway_reference_id) {
@@ -383,7 +371,9 @@ export class PaymentService {
       const remainingBalance = tx.amount_paise - totalRefunded;
 
       if (amountPaise > remainingBalance) {
-        throw new Error(`Refund amount ${amountPaise.toString()} paise exceeds available balance of ${remainingBalance.toString()} paise.`);
+        throw new Error(
+          `Refund amount ${amountPaise.toString()} paise exceeds available balance of ${remainingBalance.toString()} paise.`
+        );
       }
 
       // Create PENDING refund log
@@ -410,12 +400,7 @@ export class PaymentService {
       const adapter = GatewayFactory.getAdapter(tx.gateway_name);
 
       try {
-        const response = await adapter.refundPayment(
-          transactionId,
-          tx.gateway_reference_id,
-          amountPaise,
-          traceId
-        );
+        const response = await adapter.refundPayment(transactionId, tx.gateway_reference_id, amountPaise, traceId);
 
         if (response.success && response.gatewayReferenceId) {
           const updatedRefund = await txPrisma.refund.update({
@@ -429,9 +414,7 @@ export class PaymentService {
           // Check if fully or partially refunded
           const newTotalRefunded = totalRefunded + amountPaise;
           const finalState =
-            newTotalRefunded >= tx.amount_paise
-              ? TransactionState.REFUNDED
-              : TransactionState.PARTIALLY_REFUNDED;
+            newTotalRefunded >= tx.amount_paise ? TransactionState.REFUNDED : TransactionState.PARTIALLY_REFUNDED;
 
           await TransactionStateMachine.transition(
             txPrisma,
@@ -473,10 +456,7 @@ export class PaymentService {
   /**
    * Voids an authorized, uncaptured payment.
    */
-  public static async voidPayment(
-    transactionId: string,
-    traceId: string
-  ): Promise<Transaction> {
+  public static async voidPayment(transactionId: string, traceId: string): Promise<Transaction> {
     setLogContext('transaction_id', transactionId);
 
     return await prisma.$transaction(async (txPrisma) => {
@@ -511,11 +491,7 @@ export class PaymentService {
       const adapter = GatewayFactory.getAdapter(tx.gateway_name);
 
       try {
-        const response = await adapter.voidPayment(
-          transactionId,
-          tx.gateway_reference_id,
-          traceId
-        );
+        const response = await adapter.voidPayment(transactionId, tx.gateway_reference_id, traceId);
 
         if (response.success) {
           const updated = await txPrisma.transaction.update({

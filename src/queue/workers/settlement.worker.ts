@@ -46,7 +46,7 @@ export const settlementWorker = new Worker(
 
         // Simulate settlement reference ID generation
         const settlementRef = `set_${crypto.randomBytes(8).toString('hex')}`;
-        
+
         await prisma.$transaction(async (txPrisma) => {
           // Create Settlement Record
           await txPrisma.settlement.create({

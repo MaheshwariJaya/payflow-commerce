@@ -12,7 +12,7 @@ const prisma = new PrismaClient();
 export function idempotency(options: { ttlHours: number } = { ttlHours: 24 }) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const key = req.headers['idempotency-key'] as string;
-    
+
     // Non-mutating methods don't strictly require idempotency, but we check if key is provided
     if (req.method === 'GET' || req.method === 'DELETE') {
       return next();
@@ -41,7 +41,7 @@ export function idempotency(options: { ttlHours: number } = { ttlHours: 24 }) {
       while (attempts < 6) {
         lockToken = await LockUtil.acquireRedisLock(lockKey, 5000);
         if (lockToken) break;
-        
+
         // Wait and retry (500ms backoff)
         attempts++;
         await new Promise((resolve) => setTimeout(resolve, 500));
@@ -86,7 +86,7 @@ export function idempotency(options: { ttlHours: number } = { ttlHours: 24 }) {
         if (record.status === 'COMPLETED') {
           logger.info('Returning cached response for idempotency key', { key });
           await LockUtil.releaseRedisLock(lockKey, lockToken);
-          
+
           res.status(record.response_status || 200).json(record.response_body);
           return;
         }
@@ -111,7 +111,7 @@ export function idempotency(options: { ttlHours: number } = { ttlHours: 24 }) {
 
       // 5. Intercept response to store completion payload
       const originalSend = res.send;
-      
+
       res.send = function (body: any): Response {
         // Restore original send method immediately to prevent recursion
         res.send = originalSend;

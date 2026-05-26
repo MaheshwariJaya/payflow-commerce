@@ -35,7 +35,7 @@ export class ReconciliationService {
               trace_id: traceId,
             },
           });
-          
+
           await TransactionStateMachine.transition(
             txPrisma,
             transactionId,
@@ -59,7 +59,7 @@ export class ReconciliationService {
       const gwAmount = tx.amount_paise; // default matches
 
       // Parse metadata for simulation triggers
-      const metadata = tx.metadata as any || {};
+      const metadata = (tx.metadata as any) || {};
       const simDiscrepancyStatus = metadata.sim_recon_status_discrepancy;
       const simDiscrepancyAmount = metadata.sim_recon_amount_discrepancy;
 
@@ -168,7 +168,12 @@ export class ReconciliationService {
     const transactions = await prisma.transaction.findMany({
       where: {
         status: {
-          in: [TransactionState.CAPTURED, TransactionState.REFUNDED, TransactionState.CREATED, TransactionState.ROUTE_SELECTED],
+          in: [
+            TransactionState.CAPTURED,
+            TransactionState.REFUNDED,
+            TransactionState.CREATED,
+            TransactionState.ROUTE_SELECTED,
+          ],
         },
         created_at: { lt: oneMinuteAgo },
       },
