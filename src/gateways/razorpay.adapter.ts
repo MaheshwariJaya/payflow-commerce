@@ -88,7 +88,7 @@ export class RazorpayAdapter implements IGatewayAdapter {
 
   public async refundPayment(
     _transactionId: string,
-    _gatewayRefId: string,
+    gatewayRefId: string,
     _amountPaise: bigint,
     _traceId: string,
   ): Promise<GatewayResponse> {
@@ -143,9 +143,7 @@ export class RazorpayAdapter implements IGatewayAdapter {
 
       return this.safeCompare(razorpaySig, computed);
     } catch (err: any) {
-      logger.error('Razorpay signature verification exception', {
-        error: err.message,
-      });
+      logger.error('Razorpay signature verification exception', { error: err.message });
       return false;
     }
   }

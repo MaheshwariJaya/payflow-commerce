@@ -135,9 +135,7 @@ export class UPIAdapter implements IGatewayAdapter {
 
       return this.safeCompare(signatureToVerify, computed);
     } catch (err: any) {
-      logger.error('UPI signature verification exception', {
-        error: err.message,
-      });
+      logger.error('UPI signature verification exception', { error: err.message });
       return false;
     }
   }

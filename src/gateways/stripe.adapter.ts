@@ -90,7 +90,7 @@ export class StripeAdapter implements IGatewayAdapter {
 
   public async refundPayment(
     _transactionId: string,
-    _gatewayRefId: string,
+    gatewayRefId: string,
     _amountPaise: bigint,
     _traceId: string,
   ): Promise<GatewayResponse> {
@@ -151,9 +151,7 @@ export class StripeAdapter implements IGatewayAdapter {
 
       return this.safeCompare(signature, computed);
     } catch (err: any) {
-      logger.error('Stripe signature verification exception', {
-        error: err.message,
-      });
+      logger.error('Stripe signature verification exception', { error: err.message });
       return false;
     }
   }

@@ -28,11 +28,8 @@ export class PaymentController {
         if (parsedAmount <= BigInt(0)) {
           throw new Error('Amount must be greater than zero');
         }
-      } catch (_err: any) {
-        res.status(400).json({
-          error: 'Bad Request',
-          message: `Invalid amount_paise: ${err.message}`,
-        });
+      } catch (err: any) {
+        res.status(400).json({ error: 'Bad Request', message: `Invalid amount_paise: ${err.message}` });
         return;
       }
 
@@ -48,10 +45,8 @@ export class PaymentController {
       );
 
       res.status(201).json(serializeBigInt(transaction));
-    } catch (_err: any) {
-      logger.error('Payment controller createPayment failure', {
-        error: err.message,
-      });
+    } catch (err: any) {
+      logger.error('Payment controller createPayment failure', { error: err.message });
       next(err);
     }
   }
@@ -66,15 +61,12 @@ export class PaymentController {
       });
 
       if (!transaction) {
-        res.status(404).json({
-          error: 'Not Found',
-          message: `Transaction with ID ${id} not found.`,
-        });
+        res.status(404).json({ error: 'Not Found', message: `Transaction with ID ${id} not found.` });
         return;
       }
 
       res.status(200).json(serializeBigInt(transaction));
-    } catch (_err: any) {
+    } catch (err: any) {
       next(err);
     }
   }
@@ -86,10 +78,7 @@ export class PaymentController {
       const traceId = (res.getHeader('X-Trace-ID') as string) || 'default-trace';
 
       if (!amount_paise) {
-        res.status(400).json({
-          error: 'Bad Request',
-          message: 'Missing required parameter: amount_paise',
-        });
+        res.status(400).json({ error: 'Bad Request', message: 'Missing required parameter: amount_paise' });
         return;
       }
 
@@ -97,19 +86,14 @@ export class PaymentController {
       try {
         parsedAmount = BigInt(amount_paise);
       } catch (_err: any) {
-        res.status(400).json({
-          error: 'Bad Request',
-          message: 'Invalid amount_paise formatting',
-        });
+        res.status(400).json({ error: 'Bad Request', message: 'Invalid amount_paise formatting' });
         return;
       }
 
       const transaction = await PaymentService.capturePayment(id, parsedAmount, traceId);
       res.status(200).json(serializeBigInt(transaction));
-    } catch (_err: any) {
-      logger.error('Payment controller capturePayment failure', {
-        error: err.message,
-      });
+    } catch (err: any) {
+      logger.error('Payment controller capturePayment failure', { error: err.message });
       next(err);
     }
   }
@@ -121,10 +105,7 @@ export class PaymentController {
       const traceId = (res.getHeader('X-Trace-ID') as string) || 'default-trace';
 
       if (!amount_paise || !reason) {
-        res.status(400).json({
-          error: 'Bad Request',
-          message: 'Missing required parameters: amount_paise, reason',
-        });
+        res.status(400).json({ error: 'Bad Request', message: 'Missing required parameters: amount_paise, reason' });
         return;
       }
 
@@ -132,19 +113,14 @@ export class PaymentController {
       try {
         parsedAmount = BigInt(amount_paise);
       } catch (_err: any) {
-        res.status(400).json({
-          error: 'Bad Request',
-          message: 'Invalid amount_paise formatting',
-        });
+        res.status(400).json({ error: 'Bad Request', message: 'Invalid amount_paise formatting' });
         return;
       }
 
       const refund = await PaymentService.refundPayment(id, parsedAmount, reason, traceId);
       res.status(200).json(serializeBigInt(refund));
-    } catch (_err: any) {
-      logger.error('Payment controller refundPayment failure', {
-        error: err.message,
-      });
+    } catch (err: any) {
+      logger.error('Payment controller refundPayment failure', { error: err.message });
       next(err);
     }
   }
@@ -156,10 +132,8 @@ export class PaymentController {
 
       const transaction = await PaymentService.voidPayment(id, traceId);
       res.status(200).json(serializeBigInt(transaction));
-    } catch (_err: any) {
-      logger.error('Payment controller voidPayment failure', {
-        error: err.message,
-      });
+    } catch (err: any) {
+      logger.error('Payment controller voidPayment failure', { error: err.message });
       next(err);
     }
   }
@@ -174,7 +148,7 @@ export class PaymentController {
       });
 
       res.status(200).json(serializeBigInt(logs));
-    } catch (_err: any) {
+    } catch (err: any) {
       next(err);
     }
   }
@@ -186,7 +160,7 @@ export class PaymentController {
         orderBy: { created_at: 'desc' },
       });
       res.status(200).json(serializeBigInt(payments));
-    } catch (_err: any) {
+    } catch (err: any) {
       next(err);
     }
   }

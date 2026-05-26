@@ -135,9 +135,7 @@ export class PayUAdapter implements IGatewayAdapter {
 
       return this.safeCompare(signatureToVerify, computed);
     } catch (err: any) {
-      logger.error('PayU signature verification exception', {
-        error: err.message,
-      });
+      logger.error('PayU signature verification exception', { error: err.message });
       return false;
     }
   }
