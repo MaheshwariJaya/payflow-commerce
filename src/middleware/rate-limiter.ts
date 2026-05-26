@@ -25,7 +25,6 @@ const LUA_TOKEN_BUCKET = `
 `;
 
 export class GatewayRateLimiter {
-  // Configurable limits (capacity, tokens-per-second)
   private static limits: Record<string, { capacity: number; refillRate: number }> = {
     razorpay: { capacity: 200, refillRate: 200 },
     stripe: { capacity: 100, refillRate: 100 },
@@ -33,13 +32,12 @@ export class GatewayRateLimiter {
     upi: { capacity: 150, refillRate: 150 },
   };
 
-  /**
-   * Tries to acquire 1 token from the gateway's token bucket in Redis.
-   * Returns true if token was acquired, false if rate limit exceeded.
-   */
   public static async tryAcquire(gatewayName: string): Promise<boolean> {
     const key = `ratelimit:gateway:${gatewayName.toLowerCase()}`;
-    const limit = this.limits[gatewayName.toLowerCase()] || { capacity: 50, refillRate: 50 };
+    const limit = this.limits[gatewayName.toLowerCase()] || {
+      capacity: 50,
+      refillRate: 50,
+    };
     const now = Math.floor(Date.now() / 1000);
 
     try {
@@ -49,33 +47,29 @@ export class GatewayRateLimiter {
         key,
         limit.capacity.toString(),
         limit.refillRate.toString(),
-        now.toString()
+        now.toString(),
       );
       return result === 1;
     } catch (err: any) {
-      logger.error('Error executing Gateway Rate Limiter Lua Script', { error: err.message, gatewayName });
-      // In case Redis fails, fail-open to not block transactions in production
+      logger.error('Error executing Gateway Rate Limiter Lua Script', {
+        error: err.message,
+        gatewayName,
+      });
+
       return true;
     }
   }
 
-  /**
-   * Sets custom rate limits for a gateway.
-   */
   public static setLimit(gatewayName: string, capacity: number, refillRate: number) {
     this.limits[gatewayName.toLowerCase()] = { capacity, refillRate };
   }
 }
 
-/**
- * Express Middleware for Global API Rate Limiting.
- * Limits IP requests to e.g., 20 requests/sec.
- */
 export async function apiRateLimiter(req: Request, res: Response, next: NextFunction) {
   const ip = req.ip || req.socket.remoteAddress || 'unknown';
   const key = `ratelimit:api:${ip}`;
-  const capacity = 20; // Allow burst of 20 requests
-  const refillRate = 5; // Refill 5 tokens per second
+  const capacity = 20;
+  const refillRate = 5;
   const now = Math.floor(Date.now() / 1000);
 
   try {
@@ -85,10 +79,9 @@ export async function apiRateLimiter(req: Request, res: Response, next: NextFunc
       key,
       capacity.toString(),
       refillRate.toString(),
-      now.toString()
+      now.toString(),
     );
 
-    // Set TTL on rate limit keys so they expire
     await redis.expire(key, 60);
 
     if (result === 1) {
@@ -102,7 +95,7 @@ export async function apiRateLimiter(req: Request, res: Response, next: NextFunc
     }
   } catch (err: any) {
     logger.error('API rate limiter failure', { error: err.message });
-    // Fail-open
+
     next();
   }
 }

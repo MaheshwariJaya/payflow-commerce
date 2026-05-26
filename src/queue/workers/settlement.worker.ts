@@ -34,7 +34,6 @@ export const settlementWorker = new Worker(
           return;
         }
 
-        // Check if settlement record already exists
         const existing = await prisma.settlement.findFirst({
           where: { transaction_id: transactionId },
         });
@@ -44,11 +43,9 @@ export const settlementWorker = new Worker(
           return;
         }
 
-        // Simulate settlement reference ID generation
         const settlementRef = `set_${crypto.randomBytes(8).toString('hex')}`;
 
         await prisma.$transaction(async (txPrisma) => {
-          // Create Settlement Record
           await txPrisma.settlement.create({
             data: {
               transaction_id: transactionId,
@@ -60,7 +57,6 @@ export const settlementWorker = new Worker(
             },
           });
 
-          // Transition state to SETTLED if not already terminal
           if (tx.status === TransactionState.CAPTURED) {
             await TransactionStateMachine.transition(
               txPrisma,
@@ -69,7 +65,7 @@ export const settlementWorker = new Worker(
               'settlement_worker',
               `Settlement reference registered: ${settlementRef}`,
               null,
-              traceId
+              traceId,
             );
           }
         });
@@ -84,5 +80,5 @@ export const settlementWorker = new Worker(
       }
     });
   },
-  { connection: redis }
+  { connection: redis },
 );

@@ -8,14 +8,10 @@ import { logger } from '../utils/logger';
 const prisma = new PrismaClient();
 
 export class ConfigController {
-  /**
-   * GET /api/v1/gateways
-   */
   public static async getGateways(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const gateways = await prisma.gatewayConfig.findMany({});
 
-      // Mask credentials for security
       const sanitized = gateways.map((gw) => ({
         ...gw,
         api_key: '[MASKED]',
@@ -28,9 +24,6 @@ export class ConfigController {
     }
   }
 
-  /**
-   * GET /api/v1/gateways/:name/health
-   */
   public static async getGatewayHealth(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { name } = req.params;
@@ -39,7 +32,10 @@ export class ConfigController {
       });
 
       if (metrics.length === 0) {
-        res.status(404).json({ error: 'Not Found', message: `No health metrics found for gateway: ${name}` });
+        res.status(404).json({
+          error: 'Not Found',
+          message: `No health metrics found for gateway: ${name}`,
+        });
         return;
       }
 
@@ -49,9 +45,6 @@ export class ConfigController {
     }
   }
 
-  /**
-   * GET /api/v1/gateways/:name/metrics
-   */
   public static async getGatewayMetrics(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { name } = req.params;
@@ -60,7 +53,10 @@ export class ConfigController {
       });
 
       if (!config) {
-        res.status(404).json({ error: 'Not Found', message: `Gateway config ${name} not found.` });
+        res.status(404).json({
+          error: 'Not Found',
+          message: `Gateway config ${name} not found.`,
+        });
         return;
       }
 
@@ -76,9 +72,6 @@ export class ConfigController {
     }
   }
 
-  /**
-   * PUT /api/v1/gateways/:name/config
-   */
   public static async updateGatewayConfig(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { name } = req.params;
@@ -99,7 +92,10 @@ export class ConfigController {
       });
 
       if (!existing) {
-        res.status(404).json({ error: 'Not Found', message: `Gateway config ${name} not found.` });
+        res.status(404).json({
+          error: 'Not Found',
+          message: `Gateway config ${name} not found.`,
+        });
         return;
       }
 
@@ -113,7 +109,6 @@ export class ConfigController {
         updateData.cost_per_tx_paise = BigInt(cost_per_tx_paise);
       }
 
-      // Secure key updates: Encrypt them on saving
       if (api_key) {
         updateData.api_key = CryptoUtil.encrypt(api_key);
       }
@@ -126,29 +121,29 @@ export class ConfigController {
         data: updateData,
       });
 
-      // Update rate limiter configurations in-memory if passed
       if (rate_limit_capacity && rate_limit_refill) {
         GatewayRateLimiter.setLimit(updated.name, rate_limit_capacity, rate_limit_refill);
       }
 
-      logger.info(`Updated gateway config for ${updated.name}`, { updated_by: 'admin' });
+      logger.info(`Updated gateway config for ${updated.name}`, {
+        updated_by: 'admin',
+      });
 
       res.status(200).json(
         serializeBigInt({
           ...updated,
           api_key: '[MASKED]',
           api_secret: updated.api_secret ? '[MASKED]' : null,
-        })
+        }),
       );
     } catch (err: any) {
-      logger.error(`Failed to update config for ${req.params.name}`, { error: err.message });
+      logger.error(`Failed to update config for ${req.params.name}`, {
+        error: err.message,
+      });
       next(err);
     }
   }
 
-  /**
-   * GET /api/v1/routing/config
-   */
   public static async getRoutingConfig(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const config = await prisma.routingConfig.findFirst();
@@ -158,9 +153,6 @@ export class ConfigController {
     }
   }
 
-  /**
-   * PUT /api/v1/routing/config
-   */
   public static async updateRoutingConfig(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const {

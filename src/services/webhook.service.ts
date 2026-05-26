@@ -2,23 +2,21 @@ import { PrismaClient, WebhookStatus } from '@prisma/client';
 import { GatewayFactory } from '../gateways/gateway.factory';
 import { QueueService } from '../queue/queue.service';
 import { logger } from '../utils/logger';
-import * as crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
 export class WebhookService {
-  /**
-   * Receives and validates raw webhooks, then enqueues them for asynchronous processing.
-   */
   public static async receiveWebhook(
     gateway: string,
     headers: Record<string, string>,
     rawBody: string,
-    traceId: string
+    traceId: string,
   ): Promise<{ success: boolean; message: string }> {
-    logger.info(`Received webhook from ${gateway}`, { gateway, trace_id: traceId });
+    logger.info(`Received webhook from ${gateway}`, {
+      gateway,
+      trace_id: traceId,
+    });
 
-    // 1. Load active gateway config & webhook secret
     const config = await prisma.gatewayConfig.findUnique({
       where: { name: gateway },
     });
@@ -29,10 +27,8 @@ export class WebhookService {
       return { success: false, message: msg };
     }
 
-    // Decrypt the webhook secret
     const decryptSecret = await import('../utils/crypto.util').then((m) => m.CryptoUtil.decrypt(config.api_secret!));
 
-    // 2. Validate webhook signature & timestamp protection
     const adapter = GatewayFactory.getAdapter(gateway);
     const isValid = adapter.verifyWebhookSignature(headers, rawBody, decryptSecret);
 
@@ -42,12 +38,10 @@ export class WebhookService {
       return { success: false, message: msg };
     }
 
-    // 3. Parse payload to extract unique event ID
     const parsedBody = JSON.parse(rawBody);
     const parsedEvent = adapter.parseWebhookEvent(parsedBody);
     const eventId = parsedEvent.eventId;
 
-    // 4. Deduplicate (Check ProcessedWebhookEvent table)
     const existingProcessed = await prisma.processedWebhookEvent.findUnique({
       where: {
         gateway_event_id: {
@@ -62,9 +56,12 @@ export class WebhookService {
       return { success: true, message: 'Webhook already processed.' };
     }
 
-    // 5. Check if it's already in the queue to prevent double-enqueuing
     const existingQueueLog = await prisma.webhookQueueLog.findFirst({
-      where: { gateway, event_id: eventId, status: { in: [WebhookStatus.QUEUED, WebhookStatus.PROCESSING] } },
+      where: {
+        gateway,
+        event_id: eventId,
+        status: { in: [WebhookStatus.QUEUED, WebhookStatus.PROCESSING] },
+      },
     });
 
     if (existingQueueLog) {
@@ -72,7 +69,6 @@ export class WebhookService {
       return { success: true, message: 'Webhook already queued.' };
     }
 
-    // 6. Log the queue item in DB and enqueue in BullMQ
     await prisma.webhookQueueLog.create({
       data: {
         event_id: eventId,
@@ -94,11 +90,7 @@ export class WebhookService {
     return { success: true, message: 'Webhook successfully queued.' };
   }
 
-  /**
-   * Replays a failed/dead webhook by re-enqueuing it.
-   */
   public static async replayWebhook(eventId: string, traceId: string): Promise<{ success: boolean; message: string }> {
-    // Check WebhookQueueLog or DeadLetterQueue
     const logItem = await prisma.webhookQueueLog.findFirst({
       where: { event_id: eventId },
     });
@@ -123,7 +115,6 @@ export class WebhookService {
       throw new Error(`Webhook event with ID ${eventId} not found in Queue Logs or DLQ.`);
     }
 
-    // Update status to QUEUED
     if (logItem) {
       await prisma.webhookQueueLog.update({
         where: { id: logItem.id },
@@ -136,10 +127,14 @@ export class WebhookService {
       });
     }
 
-    // Enqueue again
     await QueueService.enqueueWebhook(gateway, eventId, payload, traceId);
 
-    logger.info(`Requeued webhook replay for ${gateway} - ${eventId}`, { trace_id: traceId });
-    return { success: true, message: `Webhook ${eventId} successfully requeued for replay.` };
+    logger.info(`Requeued webhook replay for ${gateway} - ${eventId}`, {
+      trace_id: traceId,
+    });
+    return {
+      success: true,
+      message: `Webhook ${eventId} successfully requeued for replay.`,
+    };
   }
 }

@@ -4,8 +4,7 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 const ALGORITHM = 'aes-256-gcm';
-const IV_LENGTH = 12; // GCM standard
-const AUTH_TAG_LENGTH = 16;
+const IV_LENGTH = 12;
 
 function getEncryptionKey(): Buffer {
   const keyHex = process.env.ENCRYPTION_KEY;
@@ -19,10 +18,6 @@ function getEncryptionKey(): Buffer {
 }
 
 export class CryptoUtil {
-  /**
-   * Encrypts a plaintext string using AES-256-GCM.
-   * Returns a colon-separated string format: `iv:authTag:encryptedData`
-   */
   public static encrypt(text: string): string {
     try {
       const key = getEncryptionKey();
@@ -40,9 +35,6 @@ export class CryptoUtil {
     }
   }
 
-  /**
-   * Decrypts a colon-separated encrypted string: `iv:authTag:encryptedData`
-   */
   public static decrypt(cipherText: string): string {
     try {
       const parts = cipherText.split(':');

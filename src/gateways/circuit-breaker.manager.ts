@@ -2,28 +2,22 @@ import { PrismaClient, CircuitState } from '@prisma/client';
 import { redis } from '../config/redis';
 import { logger } from '../utils/logger';
 
-const COOLDOWN_PERIOD_MS = 30000; // 30 seconds
-const FAILURE_THRESHOLD = 5; // Max failures before trip
-const CONSECUTIVE_SUCCESS_REQ = 3; // Successes in HALF_OPEN to close circuit
+const COOLDOWN_PERIOD_MS = 30000;
+const FAILURE_THRESHOLD = 5;
+const CONSECUTIVE_SUCCESS_REQ = 3;
 
 export class CircuitBreakerManager {
-  /**
-   * Checks if a gateway is available for a payment method.
-   * If state is OPEN but cooldown has passed, transitions to HALF_OPEN.
-   */
   public static async isAvailable(
     gatewayName: string,
     paymentMethod: string,
     prisma: PrismaClient,
-    traceId: string
+    traceId: string,
   ): Promise<boolean> {
     const key = `cb:${gatewayName}:${paymentMethod.toUpperCase()}`;
 
-    // 1. Read state from Redis cache
     let state = (await redis.get(`${key}:state`)) as CircuitState | null;
     let lastChangeStr = await redis.get(`${key}:last_change`);
 
-    // 2. Cache miss: read from DB and populate cache
     if (!state || !lastChangeStr) {
       const metric = await prisma.gatewayHealthMetrics.findUnique({
         where: {
@@ -35,7 +29,6 @@ export class CircuitBreakerManager {
       });
 
       if (!metric) {
-        // If config doesn't exist, assume CLOSED
         await this.syncRedis(gatewayName, paymentMethod.toUpperCase(), CircuitState.CLOSED, 0, 0, new Date());
         return true;
       }
@@ -48,7 +41,7 @@ export class CircuitBreakerManager {
         state,
         metric.failure_count,
         metric.success_count,
-        metric.last_state_change
+        metric.last_state_change,
       );
     }
 
@@ -56,13 +49,11 @@ export class CircuitBreakerManager {
       return true;
     }
 
-    // 3. State is OPEN: check if cooldown period has elapsed
     const lastChange = new Date(lastChangeStr);
     const now = new Date();
     const timeElapsed = now.getTime() - lastChange.getTime();
 
     if (timeElapsed >= COOLDOWN_PERIOD_MS) {
-      // Transition to HALF_OPEN (Allow test requests)
       logger.info(`Circuit breaker cooldown elapsed. Transitioning ${gatewayName} - ${paymentMethod} to HALF_OPEN.`, {
         gateway: gatewayName,
         payment_method: paymentMethod,
@@ -76,21 +67,18 @@ export class CircuitBreakerManager {
     return false;
   }
 
-  /**
-   * Records a success in the circuit.
-   */
   public static async recordSuccess(
     gatewayName: string,
     paymentMethod: string,
     latencyMs: number,
     prisma: PrismaClient,
-    traceId: string
+    traceId: string,
   ): Promise<void> {
     const key = `cb:${gatewayName}:${paymentMethod.toUpperCase()}`;
     const state = ((await redis.get(`${key}:state`)) as CircuitState) || CircuitState.CLOSED;
 
     await redis.incr(`${key}:successes`);
-    await redis.set(`${key}:failures`, '0'); // Reset failures on success
+    await redis.set(`${key}:failures`, '0');
 
     if (state === CircuitState.HALF_OPEN) {
       const consecutiveSuccesses = await redis.incr(`${key}:consecutive_successes`);
@@ -105,25 +93,21 @@ export class CircuitBreakerManager {
       }
     }
 
-    // Update rolling metrics in background
     await this.updateHealthMetricsInDB(gatewayName, paymentMethod.toUpperCase(), latencyMs, true, prisma);
   }
 
-  /**
-   * Records a failure in the circuit.
-   */
   public static async recordFailure(
     gatewayName: string,
     paymentMethod: string,
     error: string,
     prisma: PrismaClient,
-    traceId: string
+    traceId: string,
   ): Promise<void> {
     const key = `cb:${gatewayName}:${paymentMethod.toUpperCase()}`;
     const state = ((await redis.get(`${key}:state`)) as CircuitState) || CircuitState.CLOSED;
 
     const failures = await redis.incr(`${key}:failures`);
-    await redis.set(`${key}:consecutive_successes`, '0'); // Reset consecutive successes
+    await redis.set(`${key}:consecutive_successes`, '0');
 
     logger.warn(`Recorded gateway call failure on ${gatewayName} - ${paymentMethod}. Current failures: ${failures}`, {
       gateway: gatewayName,
@@ -133,18 +117,16 @@ export class CircuitBreakerManager {
     });
 
     if (state === CircuitState.HALF_OPEN) {
-      // Any failure in HALF_OPEN trips it back to OPEN immediately
       logger.error(
         `Circuit breaker failure in HALF_OPEN. Tripping back to OPEN for ${gatewayName} - ${paymentMethod}`,
         {
           gateway: gatewayName,
           payment_method: paymentMethod,
           trace_id: traceId,
-        }
+        },
       );
       await this.updateState(gatewayName, paymentMethod.toUpperCase(), CircuitState.OPEN, prisma, traceId);
     } else if (state === CircuitState.CLOSED && failures >= FAILURE_THRESHOLD) {
-      // Exceeded threshold in CLOSED state: trip to OPEN
       logger.error(`Circuit breaker tripped to OPEN for ${gatewayName} - ${paymentMethod}. Failures: ${failures}`, {
         gateway: gatewayName,
         payment_method: paymentMethod,
@@ -153,29 +135,23 @@ export class CircuitBreakerManager {
       await this.updateState(gatewayName, paymentMethod.toUpperCase(), CircuitState.OPEN, prisma, traceId);
     }
 
-    // Update rolling metrics in background
     await this.updateHealthMetricsInDB(gatewayName, paymentMethod.toUpperCase(), 0, false, prisma);
   }
 
-  /**
-   * Changes state in Redis cache and DB.
-   */
   private static async updateState(
     gatewayName: string,
     paymentMethod: string,
     newState: CircuitState,
     prisma: PrismaClient,
-    traceId: string
+    traceId: string,
   ): Promise<void> {
     const now = new Date();
 
-    // Sync Redis
     await redis.set(`cb:${gatewayName}:${paymentMethod}:state`, newState);
     await redis.set(`cb:${gatewayName}:${paymentMethod}:last_change`, now.toISOString());
     await redis.set(`cb:${gatewayName}:${paymentMethod}:failures`, '0');
     await redis.set(`cb:${gatewayName}:${paymentMethod}:consecutive_successes`, '0');
 
-    // Sync DB
     await prisma.gatewayHealthMetrics.update({
       where: {
         gateway_name_payment_method: {
@@ -199,16 +175,13 @@ export class CircuitBreakerManager {
     });
   }
 
-  /**
-   * Helper to write state metrics to Redis.
-   */
   private static async syncRedis(
     gatewayName: string,
     paymentMethod: string,
     state: CircuitState,
     failures: number,
     successes: number,
-    lastChange: Date
+    lastChange: Date,
   ): Promise<void> {
     const key = `cb:${gatewayName}:${paymentMethod}`;
     await redis.set(`${key}:state`, state);
@@ -217,15 +190,12 @@ export class CircuitBreakerManager {
     await redis.set(`${key}:consecutive_successes`, '0');
   }
 
-  /**
-   * Updates success rate and rolling latency on the DB health metrics.
-   */
   private static async updateHealthMetricsInDB(
     gatewayName: string,
     paymentMethod: string,
     latencyMs: number,
     isSuccess: boolean,
-    prisma: PrismaClient
+    prisma: PrismaClient,
   ): Promise<void> {
     try {
       const metric = await prisma.gatewayHealthMetrics.findUnique({
@@ -247,7 +217,6 @@ export class CircuitBreakerManager {
 
       let avgLatency = metric.avg_latency_ms;
       if (isSuccess && latencyMs > 0) {
-        // Rolling average (weighted 0.9 old, 0.1 new)
         avgLatency = metric.avg_latency_ms * 0.9 + latencyMs * 0.1;
       }
 

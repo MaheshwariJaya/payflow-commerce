@@ -2,7 +2,6 @@ import { CircuitBreakerManager } from '../src/gateways/circuit-breaker.manager';
 import { CircuitState } from '@prisma/client';
 import { redis } from '../src/config/redis';
 
-// Mock logger
 jest.mock('../src/utils/logger', () => ({
   logger: {
     info: jest.fn(),
@@ -11,7 +10,6 @@ jest.mock('../src/utils/logger', () => ({
   },
 }));
 
-// Mock Redis client
 jest.mock('../src/config/redis', () => ({
   redis: {
     get: jest.fn(),
@@ -48,7 +46,7 @@ describe('Circuit Breaker Manager Tests', () => {
   });
 
   test('Should transition OPEN to HALF_OPEN after cooldown period has elapsed', async () => {
-    const pastDate = new Date(Date.now() - 40000); // 40 seconds ago (cooldown is 30s)
+    const pastDate = new Date(Date.now() - 40000);
 
     (redis.get as jest.Mock).mockImplementation((key: string) => {
       if (key.endsWith(':state')) return Promise.resolve(CircuitState.OPEN);
@@ -58,7 +56,6 @@ describe('Circuit Breaker Manager Tests', () => {
 
     const isAvailable = await CircuitBreakerManager.isAvailable('Stripe', 'CARD', mockPrisma, 'test-trace');
 
-    // Cooldown elapsed, should trip to HALF_OPEN and return true
     expect(isAvailable).toBe(true);
     expect(redis.set).toHaveBeenCalledWith('cb:Stripe:CARD:state', CircuitState.HALF_OPEN);
     expect(mockPrisma.gatewayHealthMetrics.update).toHaveBeenCalledWith(
@@ -66,7 +63,7 @@ describe('Circuit Breaker Manager Tests', () => {
         data: expect.objectContaining({
           state: CircuitState.HALF_OPEN,
         }),
-      })
+      }),
     );
   });
 
@@ -82,13 +79,13 @@ describe('Circuit Breaker Manager Tests', () => {
         data: expect.objectContaining({
           state: CircuitState.OPEN,
         }),
-      })
+      }),
     );
   });
 
   test('Should close circuit (transition to CLOSED) after consecutive successes in HALF_OPEN', async () => {
     (redis.get as jest.Mock).mockResolvedValue(CircuitState.HALF_OPEN);
-    // Mock consecutive successes to reach threshold (3)
+
     (redis.incr as jest.Mock).mockResolvedValue(3);
 
     await CircuitBreakerManager.recordSuccess('Stripe', 'CARD', 150, mockPrisma, 'test-trace');
@@ -99,7 +96,7 @@ describe('Circuit Breaker Manager Tests', () => {
         data: expect.objectContaining({
           state: CircuitState.CLOSED,
         }),
-      })
+      }),
     );
   });
 });

@@ -3,13 +3,9 @@ import { PrismaClient, TransactionState } from '@prisma/client';
 const prisma = new PrismaClient();
 
 export class AnalyticsService {
-  /**
-   * Calculates overall and per-gateway success rates.
-   */
   public static async getSuccessRates(): Promise<any> {
     const successStates = [TransactionState.CAPTURED, TransactionState.SETTLED, TransactionState.REFUNDED];
 
-    // Global metrics
     const totalTransactions = await prisma.transaction.count();
     const successfulTransactions = await prisma.transaction.count({
       where: { status: { in: successStates } },
@@ -17,7 +13,6 @@ export class AnalyticsService {
 
     const globalSuccessRate = totalTransactions > 0 ? successfulTransactions / totalTransactions : 1.0;
 
-    // Per-Gateway metrics
     const gatewayGroup = await prisma.transaction.groupBy({
       by: ['gateway_name'],
       _count: {
@@ -65,9 +60,6 @@ export class AnalyticsService {
     };
   }
 
-  /**
-   * Calculates transaction volume in paise/cents grouped by currency and gateway.
-   */
   public static async getVolume(): Promise<any> {
     const successStates = [TransactionState.CAPTURED, TransactionState.SETTLED, TransactionState.REFUNDED];
 
@@ -90,11 +82,7 @@ export class AnalyticsService {
     }));
   }
 
-  /**
-   * Gathers dashboard diagnostic indicators including circuit breaker status, DLQ depth, and reconciliation anomalies.
-   */
   public static async getDashboardStats(): Promise<any> {
-    // 1. Get Circuit States
     const healthMetrics = await prisma.gatewayHealthMetrics.findMany({});
     const circuits = healthMetrics.map((hm) => ({
       gateway: hm.gateway_name,
@@ -106,18 +94,15 @@ export class AnalyticsService {
       avg_latency_ms: hm.avg_latency_ms,
     }));
 
-    // 2. DLQ Depth
     const dlqDepth = await prisma.deadLetterQueue.count();
     const webhookQueueDepth = await prisma.webhookQueueLog.count({
       where: { status: 'QUEUED' },
     });
 
-    // 3. Reconciliation anomalies count
     const activeAnomalies = await prisma.reconciliationAnomaly.count({
       where: { resolved: false },
     });
 
-    // 4. Volume and success rates
     const successRateInfo = await this.getSuccessRates();
     const volumeInfo = await this.getVolume();
 

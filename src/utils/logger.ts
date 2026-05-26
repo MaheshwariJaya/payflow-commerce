@@ -1,10 +1,8 @@
 import pino from 'pino';
 import { AsyncLocalStorage } from 'async_hooks';
 
-// Thread-local context storage for distributed tracing
 export const traceStore = new AsyncLocalStorage<Map<string, string>>();
 
-// Base logger configuration
 const baseLogger = pino({
   level: process.env.LOG_LEVEL || 'info',
   formatters: {
@@ -49,9 +47,6 @@ function log(level: 'info' | 'warn' | 'error' | 'debug', msg: string, metadata?:
   }
 }
 
-/**
- * Dynamically updates the current asynchronous context store.
- */
 export function setLogContext(key: string, value: string) {
   const store = traceStore.getStore();
   if (store) {

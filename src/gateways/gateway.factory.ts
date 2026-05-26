@@ -12,9 +12,6 @@ export class GatewayFactory {
     upi: new UPIAdapter(),
   };
 
-  /**
-   * Resolves and returns the gateway adapter instance for the given name.
-   */
   public static getAdapter(name: string): IGatewayAdapter {
     const adapter = this.adapters[name.toLowerCase()];
     if (!adapter) {

@@ -7,9 +7,6 @@ export interface SimulatorTrigger {
 }
 
 export class SimulatorService {
-  /**
-   * Helper to parse simulation trigger from merchant_order_id or metadata.
-   */
   public static parseTrigger(gateway: string, merchantOrderId: string, metadata: any): SimulatorTrigger {
     const checkStr = `${merchantOrderId} ${JSON.stringify(metadata || {})}`.toUpperCase();
     const g = gateway.toUpperCase();
@@ -22,7 +19,7 @@ export class SimulatorService {
     };
 
     if (matches('TIMEOUT')) {
-      return { scenario: 'TIMEOUT', latencyMs: 6000 }; // Exceeds 2-second timeout budget
+      return { scenario: 'TIMEOUT', latencyMs: 6000 };
     }
     if (matches('500') || matches('ERROR_500')) {
       return { scenario: 'ERROR_500', latencyMs: 100 };
@@ -34,7 +31,7 @@ export class SimulatorService {
       return { scenario: 'OUT_OF_ORDER', latencyMs: 50 };
     }
     if (matches('SLOW')) {
-      return { scenario: 'SLOW', latencyMs: 1500 }; // High latency but within 2 seconds
+      return { scenario: 'SLOW', latencyMs: 1500 };
     }
     if (matches('FAILURE')) {
       return { scenario: 'FAILURE', latencyMs: 100 };
@@ -45,9 +42,6 @@ export class SimulatorService {
     return { scenario: 'SUCCESS', latencyMs: 50 };
   }
 
-  /**
-   * Triggers asynchronous webhook delivery for simulation.
-   */
   public static triggerAsynchronousWebhook(
     gateway: string,
     eventId: string,
@@ -56,7 +50,7 @@ export class SimulatorService {
     currency: string,
     status: 'captured' | 'failed' | 'authorised',
     delayMs: number,
-    duplicate: boolean = false
+    duplicate: boolean = false,
   ): void {
     const payload = this.generateWebhookPayload(gateway, eventId, transactionId, amountPaise, currency, status);
     const webhookUrl = `http://localhost:${process.env.PORT || 3000}/api/v1/webhooks/${gateway.toLowerCase()}`;
@@ -65,12 +59,11 @@ export class SimulatorService {
     const sendCall = async () => {
       try {
         const bodyStr = JSON.stringify(payload);
-        // Generate header matching timing-safe HMAC SHA-256 validation requirements
+
         const crypto = await import('crypto');
         const signature = crypto.createHmac('sha256', secret).update(bodyStr).digest('hex');
         const timestamp = Math.floor(Date.now() / 1000).toString();
 
-        // Custom headers mapping to standard webhooks signature headers
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
           'X-Webhook-Signature': signature,
@@ -85,7 +78,6 @@ export class SimulatorService {
           headers['x-razorpay-signature'] = signature;
         }
 
-        // Deliver Webhook
         await axios.post(webhookUrl, payload, { headers });
         logger.info(`Simulated webhook delivered to ${gateway}`, {
           transaction_id: transactionId,
@@ -93,7 +85,6 @@ export class SimulatorService {
           status,
         });
 
-        // Trigger duplicate if requested
         if (duplicate) {
           setTimeout(async () => {
             try {
@@ -103,28 +94,29 @@ export class SimulatorService {
                 gateway,
               });
             } catch (err: any) {
-              logger.error(`Simulated duplicate webhook delivery failed`, { error: err.message });
+              logger.error(`Simulated duplicate webhook delivery failed`, {
+                error: err.message,
+              });
             }
           }, 1000);
         }
       } catch (err: any) {
-        logger.error(`Simulated webhook delivery failed to ${gateway}`, { error: err.message });
+        logger.error(`Simulated webhook delivery failed to ${gateway}`, {
+          error: err.message,
+        });
       }
     };
 
     setTimeout(sendCall, delayMs);
   }
 
-  /**
-   * Generates mock payload based on gateway format.
-   */
   private static generateWebhookPayload(
     gateway: string,
     eventId: string,
     transactionId: string,
     amountPaise: bigint,
     currency: string,
-    status: 'captured' | 'failed' | 'authorised'
+    status: 'captured' | 'failed' | 'authorised',
   ): any {
     const amtStr = amountPaise.toString();
 
@@ -142,7 +134,7 @@ export class SimulatorService {
         data: {
           object: {
             id: `pi_${transactionId}`,
-            amount: Number(amountPaise) / 100, // Stripe uses cents/dollars
+            amount: Number(amountPaise) / 100,
             currency: currency.toLowerCase(),
             status:
               status === 'captured'
@@ -172,7 +164,7 @@ export class SimulatorService {
           payment: {
             entity: {
               id: `pay_${transactionId}`,
-              amount: Number(amountPaise), // Razorpay uses paise
+              amount: Number(amountPaise),
               currency: currency,
               status: status === 'captured' ? 'captured' : status === 'authorised' ? 'authorized' : 'failed',
               order_id: `order_${transactionId}`,
@@ -186,7 +178,6 @@ export class SimulatorService {
       };
     }
 
-    // Default UPI or PayU format
     return {
       event_id: eventId,
       transaction_id: transactionId,

@@ -126,10 +126,16 @@ export const openapiSpec = {
           201: {
             description: 'Payment Created or Authorized successfully.',
           },
-          400: { description: 'Bad Request. Missing parameters or signature mismatches.' },
-          409: { description: 'Conflict. Idempotency key already processing or concurrent submit.' },
+          400: {
+            description: 'Bad Request. Missing parameters or signature mismatches.',
+          },
+          409: {
+            description: 'Conflict. Idempotency key already processing or concurrent submit.',
+          },
           429: { description: 'Too Many Requests. Rate limits exceeded.' },
-          500: { description: 'Internal Server Error. Exhausted failover options.' },
+          500: {
+            description: 'Internal Server Error. Exhausted failover options.',
+          },
         },
       },
     },
@@ -203,7 +209,10 @@ export const openapiSpec = {
                 required: ['amount_paise', 'reason'],
                 properties: {
                   amount_paise: { type: 'integer', example: 25000 },
-                  reason: { type: 'string', example: 'Customer cancellation request.' },
+                  reason: {
+                    type: 'string',
+                    example: 'Customer cancellation request.',
+                  },
                 },
               },
             },
@@ -258,7 +267,10 @@ export const openapiSpec = {
             name: 'gateway',
             in: 'path',
             required: true,
-            schema: { type: 'string', enum: ['stripe', 'razorpay', 'payu', 'upi'] },
+            schema: {
+              type: 'string',
+              enum: ['stripe', 'razorpay', 'payu', 'upi'],
+            },
           },
         ],
         requestBody: {
@@ -323,7 +335,10 @@ export const openapiSpec = {
                   base_url: { type: 'string' },
                   api_key: { type: 'string' },
                   api_secret: { type: 'string' },
-                  supported_methods: { type: 'array', items: { type: 'string' } },
+                  supported_methods: {
+                    type: 'array',
+                    items: { type: 'string' },
+                  },
                   rate_limit_capacity: { type: 'integer' },
                   rate_limit_refill: { type: 'integer' },
                 },
@@ -341,7 +356,9 @@ export const openapiSpec = {
         summary: 'Trigger Bulk Reconciliation run',
         security: [{ ApiKeyAuth: [] }],
         responses: {
-          202: { description: 'Bulk reconciliation processing started in background worker.' },
+          202: {
+            description: 'Bulk reconciliation processing started in background worker.',
+          },
         },
       },
     },
@@ -350,7 +367,9 @@ export const openapiSpec = {
         summary: 'Get Administrative Dashboard Indicators',
         security: [{ ApiKeyAuth: [] }],
         responses: {
-          200: { description: 'Returns volume sum, rates, circuit diagnostics, and DLQ levels.' },
+          200: {
+            description: 'Returns volume sum, rates, circuit diagnostics, and DLQ levels.',
+          },
         },
       },
     },

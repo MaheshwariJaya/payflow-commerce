@@ -12,17 +12,17 @@ export const webhookWorker = new Worker(
   async (job: Job) => {
     const { gateway, eventId, payload, traceId } = job.data;
 
-    // Set up AsyncLocalStorage trace logging context inside the worker execution thread
     const store = new Map<string, string>();
     store.set('trace_id', traceId);
     store.set('gateway', gateway);
     store.set('action', 'webhook_worker');
 
     return traceStore.run(store, async () => {
-      logger.info(`Webhook worker processing event: ${gateway} - ${eventId}`, { job_id: job.id });
+      logger.info(`Webhook worker processing event: ${gateway} - ${eventId}`, {
+        job_id: job.id,
+      });
 
       try {
-        // 1. Double check ProcessedWebhookEvent deduplication
         const existing = await prisma.processedWebhookEvent.findUnique({
           where: {
             gateway_event_id: {
@@ -38,17 +38,14 @@ export const webhookWorker = new Worker(
           return { status: 'duplicate' };
         }
 
-        // 2. Update status in log to PROCESSING
         await updateQueueLog(eventId, WebhookStatus.PROCESSING);
 
-        // 3. Parse Webhook
         const adapter = GatewayFactory.getAdapter(gateway);
         const parsedEvent = adapter.parseWebhookEvent(payload);
         const transactionId = parsedEvent.transactionId;
 
         store.set('transaction_id', transactionId);
 
-        // Find Transaction in DB
         const transaction = await prisma.transaction.findUnique({
           where: { id: transactionId },
         });
@@ -57,7 +54,6 @@ export const webhookWorker = new Worker(
           const msg = `Reconciliation anomaly: Webhook event reference mapping failed. Transaction ${transactionId} not found.`;
           logger.error(msg);
 
-          // Insert anomaly
           await prisma.reconciliationAnomaly.create({
             data: {
               transaction_id: null,
@@ -73,7 +69,6 @@ export const webhookWorker = new Worker(
           throw new Error(msg);
         }
 
-        // 4. State Machine Transition (compensating state steps run automatically if out-of-order)
         let targetState: TransactionState = TransactionState.CAPTURED;
         if (parsedEvent.status === 'failed') {
           targetState = TransactionState.FAILED;
@@ -93,10 +88,9 @@ export const webhookWorker = new Worker(
             'webhook_processor',
             `Processed gateway event: ${eventId}`,
             parsedEvent.rawPayload,
-            traceId
+            traceId,
           );
 
-          // Deduplicate future hits
           await txPrisma.processedWebhookEvent.create({
             data: {
               event_id: eventId,
@@ -107,18 +101,21 @@ export const webhookWorker = new Worker(
           });
         });
 
-        // 5. Success Log Update
         await updateQueueLog(eventId, WebhookStatus.PROCESSED);
-        logger.info(`Successfully finished webhook processing`, { event_id: eventId });
+        logger.info(`Successfully finished webhook processing`, {
+          event_id: eventId,
+        });
 
         return { status: 'success' };
       } catch (err: any) {
-        logger.error(`Webhook processing worker exception`, { error: err.message, event_id: eventId });
+        logger.error(`Webhook processing worker exception`, {
+          error: err.message,
+          event_id: eventId,
+        });
 
         const isFinalAttempt = (job.attemptsMade || 0) >= (job.opts.attempts || 5) - 1;
 
         if (isFinalAttempt) {
-          // Put in DLQ database table
           await prisma.deadLetterQueue.create({
             data: {
               event_id: eventId,
@@ -132,11 +129,11 @@ export const webhookWorker = new Worker(
           await updateQueueLog(eventId, WebhookStatus.RETRYING, err.message);
         }
 
-        throw err; // Signal BullMQ to retry
+        throw err;
       }
     });
   },
-  { connection: redis }
+  { connection: redis },
 );
 
 async function updateQueueLog(eventId: string, status: WebhookStatus, errorMsg: string | null = null) {

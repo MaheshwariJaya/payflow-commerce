@@ -10,7 +10,6 @@ import { telemetryMiddleware, register } from './config/telemetry';
 import { openapiSpec } from './swagger/openapi';
 import { logger } from './utils/logger';
 
-// Route Imports
 import paymentRoutes from './routes/payment.routes';
 import webhookRoutes from './routes/webhook.routes';
 import configRoutes from './routes/config.routes';
@@ -20,21 +19,18 @@ import simulatorRoutes from './routes/simulator.routes';
 
 const app = express();
 
-// 1. Basic security headers and CORS
 app.use(helmet());
 app.use(cors());
 
-// 2. Custom JSON body parser to capture raw request string (required for signature validation)
 app.use(
   express.json({
     verify: (req: any, res, buf) => {
       req.rawBody = buf.toString();
     },
-  })
+  }),
 );
 app.use(express.urlencoded({ extended: true }));
 
-// Error response format standardizer middleware
 app.use((req, res, next) => {
   const originalJson = res.json;
   res.json = function (body: any) {
@@ -61,25 +57,25 @@ app.use((req, res, next) => {
   next();
 });
 
-// 3. Distributed tracing and Prometheus request tracking
 app.use(traceMiddleware);
 app.use(telemetryMiddleware);
 
-// 4. Rate Limiting on public endpoints
 app.use('/api/v1/payments', apiRateLimiter);
 
-// 5. Auth Token Generator (utility to generate test JWT keys)
 app.post('/api/v1/auth/token', (req, res) => {
   const { customer_id } = req.body;
   if (!customer_id) {
-    res.status(400).json({ error: 'Bad Request', message: 'Missing customer_id parameter in body' });
+    res.status(400).json({
+      error: 'Bad Request',
+      message: 'Missing customer_id parameter in body',
+    });
     return;
   }
 
   const token = jwt.sign(
     { customer_id, scope: 'transactions:write' },
     process.env.JWT_SECRET || 'supersecretjwtkeyforpayflow',
-    { expiresIn: '24h' }
+    { expiresIn: '24h' },
   );
 
   res.status(200).json({
@@ -89,23 +85,18 @@ app.post('/api/v1/auth/token', (req, res) => {
   });
 });
 
-// 6. Mount Core Sub-routes
 app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/webhooks', webhookRoutes);
 app.use('/api/v1/config', configRoutes);
 app.use('/api/v1/reconciliation', reconciliationRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
 
-// Public mock sandbox simulator routes
 app.use('/api/v1/simulator', simulatorRoutes);
 
-// 7. Mount Static Dashboard UI
 app.use('/dashboard', express.static('public'));
 
-// 8. Swagger Documentation UI
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openapiSpec));
 
-// 8. Prometheus Metrics Endpoint
 app.get('/metrics', async (req, res) => {
   try {
     res.set('Content-Type', register.contentType);
@@ -115,7 +106,6 @@ app.get('/metrics', async (req, res) => {
   }
 });
 
-// 9. Standard Health Checker Endpoint
 app.get('/api/v1/health', (req, res) => {
   res.status(200).json({
     status: 'healthy',
@@ -124,8 +114,7 @@ app.get('/api/v1/health', (req, res) => {
   });
 });
 
-// 10. Global Fallback Error Handler Middleware
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   const status = err.statusCode || err.status || 500;
   const message = err.message || 'Internal Server Error';
 

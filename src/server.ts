@@ -2,7 +2,6 @@ import app from './app';
 import { startTelemetry } from './config/telemetry';
 import { logger } from './utils/logger';
 
-// 1. Initialize OpenTelemetry tracing SDK before Express starts listening
 startTelemetry();
 
 const PORT = process.env.PORT || 3000;
@@ -15,7 +14,6 @@ const server = app.listen(PORT, () => {
   });
 });
 
-// Graceful Shutdown hooks
 function handleShutdown(signal: string) {
   logger.info(`Received ${signal}. Shutting down gracefully...`);
   server.close(() => {

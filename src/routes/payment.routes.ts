@@ -5,7 +5,6 @@ import { authenticateJWTOrApiKey } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// Apply Dual JWT/API Key Authentication to all payment routes
 router.use(authenticateJWTOrApiKey);
 
 router.post('/', idempotency(), PaymentController.createPayment);

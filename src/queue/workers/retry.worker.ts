@@ -2,7 +2,6 @@ import { Worker, Job } from 'bullmq';
 import { PrismaClient, TransactionState } from '@prisma/client';
 import { redis } from '../../config/redis';
 import { logger, traceStore } from '../../utils/logger';
-import { PaymentService } from '../../services/payment.service';
 
 const prisma = new PrismaClient();
 
@@ -41,7 +40,6 @@ export const retryWorker = new Worker(
 
         logger.info(`Triggering retry attempt ${tx.retry_count + 1} for transaction ${transactionId}`);
 
-        // Update retry details in database
         await prisma.transaction.update({
           where: { id: transactionId },
           data: {
@@ -49,15 +47,11 @@ export const retryWorker = new Worker(
           },
         });
 
-        // Trigger payment orchestration retry logic
-        // We re-evaluate routing engine dynamically to route to a healthy gateway
-        // Let's implement retry routing
         const routes = await RoutingEngineRetryHelper.retryRouting(tx, traceId);
 
         if (routes.success) {
           logger.info(`Retry attempt succeeded for transaction ${transactionId}`);
         } else {
-          // Schedule next retry if count < 3
           const updatedTx = await prisma.transaction.findUnique({
             where: { id: transactionId },
           });
@@ -72,16 +66,13 @@ export const retryWorker = new Worker(
       }
     });
   },
-  { connection: redis }
+  { connection: redis },
 );
 
-/**
- * Calculates exponential backoff with random jitter and schedules the next retry in BullMQ.
- */
 async function scheduleNextRetry(transactionId: string, retryCount: number, traceId: string) {
-  const baseDelay = 1000; // 1s
-  const backoff = baseDelay * Math.pow(2, retryCount); // 2s -> 4s -> 8s
-  const jitter = Math.floor(Math.random() * 500); // 0-500ms jitter
+  const baseDelay = 1000;
+  const backoff = baseDelay * Math.pow(2, retryCount);
+  const jitter = Math.floor(Math.random() * 500);
   const totalDelay = backoff + jitter;
 
   const nextRetryAt = new Date(Date.now() + totalDelay);
@@ -101,7 +92,6 @@ async function scheduleNextRetry(transactionId: string, retryCount: number, trac
   });
 }
 
-// Inline helper to re-orchestrate failed transactions on a healthy route
 class RoutingEngineRetryHelper {
   public static async retryRouting(tx: any, traceId: string): Promise<{ success: boolean }> {
     const { RoutingEngine } = await import('../../routing-engine/routing-engine');
@@ -117,7 +107,6 @@ class RoutingEngineRetryHelper {
       for (const route of routes) {
         const gatewayName = route.gatewayName;
 
-        // Check limits and circuit
         const hasTokens = await GatewayRateLimiter.tryAcquire(gatewayName);
         if (!hasTokens) continue;
 
@@ -125,7 +114,6 @@ class RoutingEngineRetryHelper {
         if (!isAvailable) continue;
 
         try {
-          // Transition from FAILED back to ROUTE_SELECTED to run gateway retry
           await prisma.$transaction(async (txPrisma) => {
             await txPrisma.transaction.update({
               where: { id: tx.id },
@@ -138,7 +126,7 @@ class RoutingEngineRetryHelper {
               'retry_worker',
               `Retry routing to ${gatewayName}`,
               null,
-              traceId
+              traceId,
             );
           });
 
@@ -154,10 +142,10 @@ class RoutingEngineRetryHelper {
                 tx.payment_method,
                 tx.merchant_order_id,
                 tx.metadata,
-                traceId
+                traceId,
               ),
             2000,
-            `Retry Gateway: ${gatewayName}`
+            `Retry Gateway: ${gatewayName}`,
           );
 
           const latency = Date.now() - startTime;
@@ -180,7 +168,7 @@ class RoutingEngineRetryHelper {
                 'retry_worker',
                 `Retry succeeded via ${gatewayName}`,
                 null,
-                traceId
+                traceId,
               );
             });
 
@@ -191,7 +179,7 @@ class RoutingEngineRetryHelper {
               tx.payment_method,
               response.error || 'Retry gateway error',
               prisma,
-              traceId
+              traceId,
             );
           }
         } catch (e: any) {
@@ -199,10 +187,11 @@ class RoutingEngineRetryHelper {
         }
       }
     } catch (routeErr: any) {
-      logger.error('Retry routing engine query failed', { error: routeErr.message });
+      logger.error('Retry routing engine query failed', {
+        error: routeErr.message,
+      });
     }
 
-    // If retry routing fails, transition state back to FAILED
     await prisma.$transaction(async (txPrisma) => {
       await TransactionStateMachine.transition(
         txPrisma,
@@ -211,7 +200,7 @@ class RoutingEngineRetryHelper {
         'retry_worker',
         'Retry routing attempt failed on all pathways',
         null,
-        traceId
+        traceId,
       );
     });
 

@@ -6,14 +6,10 @@ import * as crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
-/**
- * Middleware to enforce and handle idempotency for state-mutating requests.
- */
 export function idempotency(options: { ttlHours: number } = { ttlHours: 24 }) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const key = req.headers['idempotency-key'] as string;
 
-    // Non-mutating methods don't strictly require idempotency, but we check if key is provided
     if (req.method === 'GET' || req.method === 'DELETE') {
       return next();
     }
@@ -26,7 +22,6 @@ export function idempotency(options: { ttlHours: number } = { ttlHours: 24 }) {
       return;
     }
 
-    // Hash the body to detect key reuse with modified payloads
     const requestHash = crypto
       .createHash('sha256')
       .update(JSON.stringify(req.body || {}))
@@ -36,13 +31,11 @@ export function idempotency(options: { ttlHours: number } = { ttlHours: 24 }) {
     let lockToken: string | null = null;
 
     try {
-      // 1. Try to acquire the Redis distributed lock to handle concurrent submits
       let attempts = 0;
       while (attempts < 6) {
         lockToken = await LockUtil.acquireRedisLock(lockKey, 5000);
         if (lockToken) break;
 
-        // Wait and retry (500ms backoff)
         attempts++;
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
@@ -56,13 +49,11 @@ export function idempotency(options: { ttlHours: number } = { ttlHours: 24 }) {
         return;
       }
 
-      // 2. Query idempotency record from PostgreSQL
       const record = await prisma.idempotencyKey.findUnique({
         where: { key },
       });
 
       if (record) {
-        // Double Check Hash to prevent malicious reuse
         if (record.request_hash !== requestHash) {
           logger.error('Idempotency key reuse detected with different payload hash', { key });
           await LockUtil.releaseRedisLock(lockKey, lockToken);
@@ -92,7 +83,6 @@ export function idempotency(options: { ttlHours: number } = { ttlHours: 24 }) {
         }
       }
 
-      // 3. Register PENDING transaction in DB
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + options.ttlHours);
 
@@ -105,18 +95,14 @@ export function idempotency(options: { ttlHours: number } = { ttlHours: 24 }) {
         },
       });
 
-      // 4. Release lock so long running gateway operations don't block concurrent status checks
       await LockUtil.releaseRedisLock(lockKey, lockToken);
       lockToken = null;
 
-      // 5. Intercept response to store completion payload
       const originalSend = res.send;
 
       res.send = function (body: any): Response {
-        // Restore original send method immediately to prevent recursion
         res.send = originalSend;
 
-        // Process response storage asynchronously
         const responseStatus = res.statusCode;
         let responseBody: any;
         try {
@@ -125,7 +111,6 @@ export function idempotency(options: { ttlHours: number } = { ttlHours: 24 }) {
           responseBody = body;
         }
 
-        // Run update in background
         (async () => {
           let updateLock: string | null = null;
           try {
@@ -141,7 +126,10 @@ export function idempotency(options: { ttlHours: number } = { ttlHours: 24 }) {
               });
             }
           } catch (err: any) {
-            logger.error('Failed to update idempotency response cache', { key, error: err.message });
+            logger.error('Failed to update idempotency response cache', {
+              key,
+              error: err.message,
+            });
           } finally {
             if (updateLock) {
               await LockUtil.releaseRedisLock(lockKey, updateLock);
@@ -154,7 +142,10 @@ export function idempotency(options: { ttlHours: number } = { ttlHours: 24 }) {
 
       next();
     } catch (error: any) {
-      logger.error('Idempotency middleware exception', { error: error.message, key });
+      logger.error('Idempotency middleware exception', {
+        error: error.message,
+        key,
+      });
       if (lockToken) {
         await LockUtil.releaseRedisLock(lockKey, lockToken);
       }

@@ -1,7 +1,7 @@
 import { IGatewayAdapter, GatewayResponse, ParsedWebhookEvent } from './gateway.interface';
 import { SimulatorService } from './simulator.service';
 import { logger } from '../utils/logger';
-import axios from 'axios';
+
 import * as crypto from 'crypto';
 
 export class StripeAdapter implements IGatewayAdapter {
@@ -14,11 +14,10 @@ export class StripeAdapter implements IGatewayAdapter {
     paymentMethod: string,
     merchantOrderId: string,
     metadata: any,
-    traceId: string
+    _traceId: string,
   ): Promise<GatewayResponse> {
     const trigger = SimulatorService.parseTrigger(this.name, merchantOrderId, metadata);
 
-    // Simulate delay
     if (trigger.latencyMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, trigger.latencyMs));
     }
@@ -43,10 +42,8 @@ export class StripeAdapter implements IGatewayAdapter {
       };
     }
 
-    // Default Success Flow
     const gatewayRef = `pi_${transactionId}`;
 
-    // Trigger webhook asynchronously (out-of-order scenario if requested)
     const webhookDelay = trigger.scenario === 'OUT_OF_ORDER' ? 0 : 500;
     const actualDelay = trigger.scenario === 'DELAYED_WEBHOOK' ? 8000 : webhookDelay;
     const webhookStatus = trigger.scenario === ('AUTH_ONLY' as any) ? 'authorised' : 'captured';
@@ -58,7 +55,7 @@ export class StripeAdapter implements IGatewayAdapter {
       amountPaise,
       currency,
       webhookStatus as any,
-      actualDelay
+      actualDelay,
     );
 
     return {
@@ -77,8 +74,8 @@ export class StripeAdapter implements IGatewayAdapter {
   public async capturePayment(
     transactionId: string,
     gatewayRefId: string,
-    amountPaise: bigint,
-    traceId: string
+    _amountPaise: bigint,
+    _traceId: string,
   ): Promise<GatewayResponse> {
     return {
       success: true,
@@ -92,10 +89,10 @@ export class StripeAdapter implements IGatewayAdapter {
   }
 
   public async refundPayment(
-    transactionId: string,
-    gatewayRefId: string,
-    amountPaise: bigint,
-    traceId: string
+    _transactionId: string,
+    _gatewayRefId: string,
+    _amountPaise: bigint,
+    _traceId: string,
   ): Promise<GatewayResponse> {
     const refundId = `re_${crypto.randomUUID()}`;
     return {
@@ -110,7 +107,7 @@ export class StripeAdapter implements IGatewayAdapter {
     };
   }
 
-  public async voidPayment(transactionId: string, gatewayRefId: string, traceId: string): Promise<GatewayResponse> {
+  public async voidPayment(transactionId: string, gatewayRefId: string, _traceId: string): Promise<GatewayResponse> {
     return {
       success: true,
       gatewayReferenceId: gatewayRefId,
@@ -126,13 +123,11 @@ export class StripeAdapter implements IGatewayAdapter {
     try {
       const stripeHeader = headers['stripe-signature'] || '';
 
-      // Parse header: t=12345,v1=abcde
       const parts = stripeHeader.split(',');
       const tPart = parts.find((p) => p.startsWith('t='));
       const v1Part = parts.find((p) => p.startsWith('v1='));
 
       if (!tPart || !v1Part) {
-        // Fallback for direct simulator posts
         const fallbackSig = headers['x-webhook-signature'] || headers['X-Webhook-Signature'];
         if (fallbackSig) {
           const computed = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
@@ -144,7 +139,6 @@ export class StripeAdapter implements IGatewayAdapter {
       const timestamp = tPart.split('=')[1];
       const signature = v1Part.split('=')[1];
 
-      // Replay Attack Protection (5 minutes window)
       const now = Math.floor(Date.now() / 1000);
       const timeDiff = Math.abs(now - parseInt(timestamp, 10));
       if (timeDiff > 300) {
@@ -152,13 +146,14 @@ export class StripeAdapter implements IGatewayAdapter {
         return false;
       }
 
-      // Recompute Signature
       const payload = `${timestamp}.${rawBody}`;
       const computed = crypto.createHmac('sha256', secret).update(payload).digest('hex');
 
       return this.safeCompare(signature, computed);
     } catch (err: any) {
-      logger.error('Stripe signature verification exception', { error: err.message });
+      logger.error('Stripe signature verification exception', {
+        error: err.message,
+      });
       return false;
     }
   }

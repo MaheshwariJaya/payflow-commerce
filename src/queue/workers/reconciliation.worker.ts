@@ -20,10 +20,13 @@ export const reconciliationWorker = new Worker(
         await ReconciliationService.reconcileTransaction(transactionId, traceId);
         logger.info(`Reconciliation checks completed for transaction: ${transactionId}`);
       } catch (err: any) {
-        logger.error(`Reconciliation worker failed`, { error: err.message, transaction_id: transactionId });
+        logger.error(`Reconciliation worker failed`, {
+          error: err.message,
+          transaction_id: transactionId,
+        });
         throw err;
       }
     });
   },
-  { connection: redis }
+  { connection: redis },
 );

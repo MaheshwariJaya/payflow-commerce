@@ -25,12 +25,10 @@ const MockRedisConstructor = jest.fn().mockImplementation(() => {
   return new MockRedis();
 });
 
-// Enforce default export compatibility
 (MockRedisConstructor as any).default = MockRedisConstructor;
 
 jest.mock('ioredis', () => MockRedisConstructor);
 
-// Define global prisma mock functions to prevent crossed mock functions across files
 const mockCreate = jest.fn();
 const mockUpdate = jest.fn();
 const mockFindUnique = jest.fn();

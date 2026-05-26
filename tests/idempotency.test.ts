@@ -1,8 +1,7 @@
+import crypto from 'crypto';
 import { idempotency } from '../src/middleware/idempotency.middleware';
 import { LockUtil } from '../src/utils/lock.util';
-import { PrismaClient } from '@prisma/client';
 
-// Mock logger
 jest.mock('../src/utils/logger', () => ({
   logger: {
     info: jest.fn(),
@@ -13,9 +12,7 @@ jest.mock('../src/utils/logger', () => ({
 
 const mockFindUnique = (global as any).mockFindUnique;
 const mockCreate = (global as any).mockCreate;
-const mockUpdate = (global as any).mockUpdate;
 
-// Mock LockUtil
 jest.mock('../src/utils/lock.util', () => ({
   LockUtil: {
     acquireRedisLock: jest.fn(),
@@ -60,7 +57,7 @@ describe('Idempotency Middleware Tests', () => {
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
         error: 'Bad Request',
-      })
+      }),
     );
     expect(next).not.toHaveBeenCalled();
   });
@@ -68,14 +65,16 @@ describe('Idempotency Middleware Tests', () => {
   test('Should yield to next() if no previous key exists (initial request)', async () => {
     (LockUtil.acquireRedisLock as jest.Mock).mockResolvedValue('mock-token-abc');
     (LockUtil.releaseRedisLock as jest.Mock).mockResolvedValue(true);
-    mockFindUnique.mockResolvedValue(null); // Key not found in DB
+    mockFindUnique.mockResolvedValue(null);
     mockCreate.mockResolvedValue({});
 
     const middleware = idempotency();
     await middleware(req, res, next);
 
     expect(LockUtil.acquireRedisLock).toHaveBeenCalled();
-    expect(mockFindUnique).toHaveBeenCalledWith({ where: { key: 'test-idemp-key-123' } });
+    expect(mockFindUnique).toHaveBeenCalledWith({
+      where: { key: 'test-idemp-key-123' },
+    });
     expect(mockCreate).toHaveBeenCalled();
     expect(LockUtil.releaseRedisLock).toHaveBeenCalledWith('idempotency:test-idemp-key-123', 'mock-token-abc');
     expect(next).toHaveBeenCalled();
@@ -85,8 +84,6 @@ describe('Idempotency Middleware Tests', () => {
     (LockUtil.acquireRedisLock as jest.Mock).mockResolvedValue('mock-token-abc');
     (LockUtil.releaseRedisLock as jest.Mock).mockResolvedValue(true);
 
-    // Hash matching current body { amount: 5000 }
-    const crypto = require('crypto');
     const hash = crypto.createHash('sha256').update(JSON.stringify(req.body)).digest('hex');
 
     mockFindUnique.mockResolvedValue({
@@ -111,7 +108,7 @@ describe('Idempotency Middleware Tests', () => {
 
     mockFindUnique.mockResolvedValue({
       key: 'test-idemp-key-123',
-      request_hash: 'different-payload-hash-xyz', // Mismatch!
+      request_hash: 'different-payload-hash-xyz',
       status: 'COMPLETED',
       response_status: 201,
       response_body: { success: true },
@@ -124,7 +121,7 @@ describe('Idempotency Middleware Tests', () => {
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
         message: expect.stringContaining('different request payload'),
-      })
+      }),
     );
     expect(next).not.toHaveBeenCalled();
   });
@@ -133,7 +130,6 @@ describe('Idempotency Middleware Tests', () => {
     (LockUtil.acquireRedisLock as jest.Mock).mockResolvedValue('mock-token-abc');
     (LockUtil.releaseRedisLock as jest.Mock).mockResolvedValue(true);
 
-    const crypto = require('crypto');
     const hash = crypto.createHash('sha256').update(JSON.stringify(req.body)).digest('hex');
 
     mockFindUnique.mockResolvedValue({
@@ -149,7 +145,7 @@ describe('Idempotency Middleware Tests', () => {
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
         error: 'Conflict',
-      })
+      }),
     );
     expect(next).not.toHaveBeenCalled();
   });

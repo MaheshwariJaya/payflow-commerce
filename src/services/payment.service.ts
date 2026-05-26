@@ -11,9 +11,6 @@ import { logger, setLogContext } from '../utils/logger';
 const prisma = new PrismaClient();
 
 export class PaymentService {
-  /**
-   * Initiates payment routing, failover, rate-limiting, and circuit checking.
-   */
   public static async createPayment(
     amountPaise: bigint,
     currency: string,
@@ -22,7 +19,7 @@ export class PaymentService {
     merchantOrderId: string,
     idempotencyKey: string,
     metadata: any,
-    traceId: string
+    traceId: string,
   ): Promise<Transaction> {
     logger.info('Initializing payment request', {
       amountPaise: amountPaise.toString(),
@@ -32,7 +29,6 @@ export class PaymentService {
       trace_id: traceId,
     });
 
-    // 1. Save baseline CREATED transaction
     const tx = await prisma.$transaction(async (txPrisma) => {
       const createdTx = await txPrisma.transaction.create({
         data: {
@@ -48,7 +44,6 @@ export class PaymentService {
         },
       });
 
-      // Record first state audit log
       await txPrisma.transactionStateLog.create({
         data: {
           transaction_id: createdTx.id,
@@ -65,7 +60,6 @@ export class PaymentService {
 
     setLogContext('transaction_id', tx.id);
 
-    // 2. Query routing engine for scored candidates
     let routes;
     try {
       routes = await RoutingEngine.selectRoute(prisma, amountPaise, currency, paymentMethod, traceId);
@@ -79,13 +73,12 @@ export class PaymentService {
           'payment_service',
           `Routing failed: ${routeErr.message}`,
           null,
-          traceId
+          traceId,
         );
       });
       throw routeErr;
     }
 
-    // 3. Failover Loop
     let successfulTx: Transaction | null = null;
     let errors: string[] = [];
 
@@ -93,7 +86,6 @@ export class PaymentService {
       const gatewayName = route.gatewayName;
       setLogContext('gateway', gatewayName);
 
-      // Check Rate Limits
       const hasTokens = await GatewayRateLimiter.tryAcquire(gatewayName);
       if (!hasTokens) {
         const msg = `Rate limit exceeded for gateway ${gatewayName}. Skipping...`;
@@ -102,7 +94,6 @@ export class PaymentService {
         continue;
       }
 
-      // Check Circuit Breaker State
       const isAvailable = await CircuitBreakerManager.isAvailable(gatewayName, paymentMethod, prisma, traceId);
       if (!isAvailable) {
         const msg = `Circuit breaker is OPEN/Tripped for gateway ${gatewayName} - ${paymentMethod}. Skipping...`;
@@ -111,14 +102,12 @@ export class PaymentService {
         continue;
       }
 
-      // Try processing payment through this gateway
       try {
         logger.info(`Attempting payment routing through ${gatewayName}`, {
           gateway: gatewayName,
           score: route.score,
         });
 
-        // Update state to ROUTE_SELECTED
         await prisma.$transaction(async (txPrisma) => {
           await txPrisma.transaction.update({
             where: { id: tx.id },
@@ -132,26 +121,23 @@ export class PaymentService {
             'payment_service',
             `Selected gateway: ${gatewayName}`,
             { score: route.score },
-            traceId
+            traceId,
           );
         });
 
-        // Initialize adapter
         const adapter = GatewayFactory.getAdapter(gatewayName);
         const startTime = Date.now();
 
-        // Wrap execution in 2-second timeout
         const gatewayResponse = await withTimeout(
           async () =>
             adapter.initializePayment(tx.id, amountPaise, currency, paymentMethod, merchantOrderId, metadata, traceId),
           2000,
-          `Gateway: ${gatewayName} initialize`
+          `Gateway: ${gatewayName} initialize`,
         );
 
         const latency = Date.now() - startTime;
 
         if (gatewayResponse.success && gatewayResponse.gatewayReferenceId) {
-          // Success: Update circuit and status
           await CircuitBreakerManager.recordSuccess(gatewayName, paymentMethod, latency, prisma, traceId);
 
           successfulTx = await prisma.$transaction(async (txPrisma) => {
@@ -172,7 +158,7 @@ export class PaymentService {
               'payment_service',
               `Gateway success reference: ${gatewayResponse.gatewayReferenceId}`,
               { raw: gatewayResponse.rawResponse },
-              traceId
+              traceId,
             );
 
             return updated;
@@ -183,24 +169,27 @@ export class PaymentService {
             latency_ms: latency,
           });
 
-          // Enqueue async tasks like settlements if payment is captured immediately
           if (gatewayResponse.status === 'captured') {
             await QueueService.enqueueSettlement(tx.id, traceId);
           }
 
-          break; // Exit loop on success
+          break;
         } else {
-          // Failed Gateway Response (e.g. Card Declined)
           const errorMsg = gatewayResponse.error || 'Gateway returned failure status';
-          logger.warn(`Gateway payment execution failed`, { gateway: gatewayName, error: errorMsg });
+          logger.warn(`Gateway payment execution failed`, {
+            gateway: gatewayName,
+            error: errorMsg,
+          });
           errors.push(`${gatewayName} failed: ${errorMsg}`);
 
           await CircuitBreakerManager.recordFailure(gatewayName, paymentMethod, errorMsg, prisma, traceId);
         }
       } catch (err: any) {
-        // Network Timeout or connection errors
         const errorMsg = err.message || 'Unknown network error';
-        logger.error(`Gateway request connection exception`, { gateway: gatewayName, error: errorMsg });
+        logger.error(`Gateway request connection exception`, {
+          gateway: gatewayName,
+          error: errorMsg,
+        });
         errors.push(`${gatewayName} error: ${errorMsg}`);
 
         await CircuitBreakerManager.recordFailure(gatewayName, paymentMethod, errorMsg, prisma, traceId);
@@ -211,7 +200,6 @@ export class PaymentService {
       return successfulTx;
     }
 
-    // 4. All gateways failed: Fail the transaction
     const finalErrorMsg = `All routing pathways failed. Errors: ${errors.join(' | ')}`;
     logger.error(finalErrorMsg, { transaction_id: tx.id });
 
@@ -230,20 +218,17 @@ export class PaymentService {
         'payment_service',
         'Routing failover exhausted all active pathways',
         { errors },
-        traceId
+        traceId,
       );
 
       return failedTx;
     });
   }
 
-  /**
-   * Captures an authorized payment.
-   */
   public static async capturePayment(
     transactionId: string,
     amountPaise: bigint,
-    traceId: string
+    traceId: string,
   ): Promise<Transaction> {
     setLogContext('transaction_id', transactionId);
 
@@ -266,7 +251,6 @@ export class PaymentService {
 
       setLogContext('gateway', tx.gateway_name);
 
-      // Transition to CAPTURE_INITIATED
       await TransactionStateMachine.transition(
         txPrisma,
         transactionId,
@@ -274,7 +258,7 @@ export class PaymentService {
         'payment_service',
         'Initiating capture request',
         null,
-        traceId
+        traceId,
       );
 
       const adapter = GatewayFactory.getAdapter(tx.gateway_name);
@@ -298,10 +282,9 @@ export class PaymentService {
             'payment_service',
             `Capture success. Amount captured: ${amountPaise.toString()} paise`,
             response.rawResponse,
-            traceId
+            traceId,
           );
 
-          // Enqueue settlement background processing
           await QueueService.enqueueSettlement(transactionId, traceId);
 
           return updated;
@@ -318,7 +301,7 @@ export class PaymentService {
           'payment_service',
           `Capture failed: ${err.message}`,
           null,
-          traceId
+          traceId,
         );
 
         throw err;
@@ -326,14 +309,11 @@ export class PaymentService {
     });
   }
 
-  /**
-   * Fully or partially refunds a captured/settled transaction.
-   */
   public static async refundPayment(
     transactionId: string,
     amountPaise: bigint,
     reason: string,
-    traceId: string
+    traceId: string,
   ): Promise<Refund> {
     setLogContext('transaction_id', transactionId);
 
@@ -353,7 +333,7 @@ export class PaymentService {
         tx.status !== TransactionState.PARTIALLY_REFUNDED
       ) {
         throw new Error(
-          `Cannot refund transaction in status: ${tx.status}. Must be CAPTURED, SETTLED, or PARTIALLY_REFUNDED.`
+          `Cannot refund transaction in status: ${tx.status}. Must be CAPTURED, SETTLED, or PARTIALLY_REFUNDED.`,
         );
       }
 
@@ -363,7 +343,6 @@ export class PaymentService {
 
       setLogContext('gateway', tx.gateway_name);
 
-      // Verify refund limits
       const totalRefunded = tx.refunds
         .filter((r) => r.status === 'REFUNDED')
         .reduce((sum, r) => sum + r.amount_paise, BigInt(0));
@@ -372,11 +351,10 @@ export class PaymentService {
 
       if (amountPaise > remainingBalance) {
         throw new Error(
-          `Refund amount ${amountPaise.toString()} paise exceeds available balance of ${remainingBalance.toString()} paise.`
+          `Refund amount ${amountPaise.toString()} paise exceeds available balance of ${remainingBalance.toString()} paise.`,
         );
       }
 
-      // Create PENDING refund log
       const refund = await txPrisma.refund.create({
         data: {
           transaction_id: transactionId,
@@ -386,7 +364,6 @@ export class PaymentService {
         },
       });
 
-      // Transition transaction state
       await TransactionStateMachine.transition(
         txPrisma,
         transactionId,
@@ -394,7 +371,7 @@ export class PaymentService {
         'payment_service',
         `Initiating refund of ${amountPaise.toString()} paise`,
         { refund_id: refund.id },
-        traceId
+        traceId,
       );
 
       const adapter = GatewayFactory.getAdapter(tx.gateway_name);
@@ -411,7 +388,6 @@ export class PaymentService {
             },
           });
 
-          // Check if fully or partially refunded
           const newTotalRefunded = totalRefunded + amountPaise;
           const finalState =
             newTotalRefunded >= tx.amount_paise ? TransactionState.REFUNDED : TransactionState.PARTIALLY_REFUNDED;
@@ -423,7 +399,7 @@ export class PaymentService {
             'payment_service',
             `Refund executed successfully. Reference: ${response.gatewayReferenceId}`,
             response.rawResponse,
-            traceId
+            traceId,
           );
 
           return updatedRefund;
@@ -445,7 +421,7 @@ export class PaymentService {
           'payment_service',
           `Refund failed: ${err.message}`,
           null,
-          traceId
+          traceId,
         );
 
         throw err;
@@ -453,9 +429,6 @@ export class PaymentService {
     });
   }
 
-  /**
-   * Voids an authorized, uncaptured payment.
-   */
   public static async voidPayment(transactionId: string, traceId: string): Promise<Transaction> {
     setLogContext('transaction_id', transactionId);
 
@@ -485,7 +458,7 @@ export class PaymentService {
         'payment_service',
         'Initiating void authorization',
         null,
-        traceId
+        traceId,
       );
 
       const adapter = GatewayFactory.getAdapter(tx.gateway_name);
@@ -506,7 +479,7 @@ export class PaymentService {
             'payment_service',
             'Void execution completed',
             response.rawResponse,
-            traceId
+            traceId,
           );
 
           return updated;
@@ -523,7 +496,7 @@ export class PaymentService {
           'payment_service',
           `Void execution failed: ${err.message}`,
           null,
-          traceId
+          traceId,
         );
 
         throw err;

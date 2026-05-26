@@ -25,21 +25,21 @@ export interface IGatewayAdapter {
     paymentMethod: string,
     merchantOrderId: string,
     metadata: any,
-    traceId: string
+    traceId: string,
   ): Promise<GatewayResponse>;
 
   capturePayment(
     transactionId: string,
     gatewayRefId: string,
     amountPaise: bigint,
-    traceId: string
+    traceId: string,
   ): Promise<GatewayResponse>;
 
   refundPayment(
     transactionId: string,
     gatewayRefId: string,
     amountPaise: bigint,
-    traceId: string
+    traceId: string,
   ): Promise<GatewayResponse>;
 
   voidPayment(transactionId: string, gatewayRefId: string, traceId: string): Promise<GatewayResponse>;

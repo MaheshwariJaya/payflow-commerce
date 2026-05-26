@@ -4,7 +4,6 @@ import { authenticateApiKey } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// Apply administrative API Key protection to all config routes
 router.use(authenticateApiKey);
 
 router.get('/gateways', ConfigController.getGateways);

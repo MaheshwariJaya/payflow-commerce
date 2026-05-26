@@ -1,16 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import * as promClient from 'prom-client';
-import { trace, context } from '@opentelemetry/api';
+import { trace } from '@opentelemetry/api';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { Resource } from '@opentelemetry/resources';
 import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
 import { logger } from '../utils/logger';
 
-// 1. Prometheus Registry & Metrics Setup
 export const register = new promClient.Registry();
 promClient.collectDefaultMetrics({ register });
 
-// Core counters & gauges
 export const httpRequestsCounter = new promClient.Counter({
   name: 'http_requests_total',
   help: 'Total number of HTTP requests processed',
@@ -46,9 +44,6 @@ export const gatewayCircuitGauge = new promClient.Gauge({
   registers: [register],
 });
 
-/**
- * Express Middleware to track HTTP request metrics.
- */
 export function telemetryMiddleware(req: Request, res: Response, next: NextFunction): void {
   const start = process.hrtime();
 
@@ -86,7 +81,7 @@ export function startTelemetry() {
 export async function runInSpan<T>(
   spanName: string,
   attributes: Record<string, string>,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
 ): Promise<T> {
   const tracer = trace.getTracer('payflow-tracer');
   return tracer.startActiveSpan(spanName, async (span) => {

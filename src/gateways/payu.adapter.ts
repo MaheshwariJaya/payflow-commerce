@@ -13,11 +13,10 @@ export class PayUAdapter implements IGatewayAdapter {
     paymentMethod: string,
     merchantOrderId: string,
     metadata: any,
-    traceId: string
+    _traceId: string,
   ): Promise<GatewayResponse> {
     const trigger = SimulatorService.parseTrigger(this.name, merchantOrderId, metadata);
 
-    // Simulate delay
     if (trigger.latencyMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, trigger.latencyMs));
     }
@@ -44,7 +43,6 @@ export class PayUAdapter implements IGatewayAdapter {
 
     const gatewayRef = `payu_${transactionId}`;
 
-    // Trigger webhook asynchronously
     const actualDelay = trigger.scenario === 'DELAYED_WEBHOOK' ? 8000 : 500;
     SimulatorService.triggerAsynchronousWebhook(
       this.name,
@@ -53,7 +51,7 @@ export class PayUAdapter implements IGatewayAdapter {
       amountPaise,
       currency,
       'captured',
-      actualDelay
+      actualDelay,
     );
 
     return {
@@ -72,8 +70,8 @@ export class PayUAdapter implements IGatewayAdapter {
   public async capturePayment(
     transactionId: string,
     gatewayRefId: string,
-    amountPaise: bigint,
-    traceId: string
+    _amountPaise: bigint,
+    _traceId: string,
   ): Promise<GatewayResponse> {
     return {
       success: true,
@@ -87,10 +85,10 @@ export class PayUAdapter implements IGatewayAdapter {
   }
 
   public async refundPayment(
-    transactionId: string,
-    gatewayRefId: string,
-    amountPaise: bigint,
-    traceId: string
+    _transactionId: string,
+    _gatewayRefId: string,
+    _amountPaise: bigint,
+    _traceId: string,
   ): Promise<GatewayResponse> {
     const refundId = `payuref_${crypto.randomUUID()}`;
     return {
@@ -104,7 +102,7 @@ export class PayUAdapter implements IGatewayAdapter {
     };
   }
 
-  public async voidPayment(transactionId: string, gatewayRefId: string, traceId: string): Promise<GatewayResponse> {
+  public async voidPayment(transactionId: string, gatewayRefId: string, _traceId: string): Promise<GatewayResponse> {
     return {
       success: true,
       gatewayReferenceId: gatewayRefId,
@@ -123,10 +121,8 @@ export class PayUAdapter implements IGatewayAdapter {
 
       if (!signatureToVerify) return false;
 
-      // Recompute Signature
       const computed = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
 
-      // Check timestamp header if present
       const timestampHeader = headers['x-webhook-timestamp'] || headers['X-Webhook-Timestamp'];
       if (timestampHeader) {
         const now = Math.floor(Date.now() / 1000);
@@ -139,7 +135,9 @@ export class PayUAdapter implements IGatewayAdapter {
 
       return this.safeCompare(signatureToVerify, computed);
     } catch (err: any) {
-      logger.error('PayU signature verification exception', { error: err.message });
+      logger.error('PayU signature verification exception', {
+        error: err.message,
+      });
       return false;
     }
   }

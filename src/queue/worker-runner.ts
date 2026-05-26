@@ -9,7 +9,6 @@ import { logger } from '../utils/logger';
 async function startWorkers() {
   logger.info('Starting background queue workers...');
 
-  // Setup generic event handlers for monitoring
   const workers = [
     { name: 'Webhook Worker', worker: webhookWorker },
     { name: 'Reconciliation Worker', worker: reconciliationWorker },
@@ -36,9 +35,7 @@ async function startWorkers() {
     });
   }
 
-  // Register repeatable cron job for rolling metrics aggregation (runs every 5 minutes)
   try {
-    // Clear old repetitions to prevent duplication
     const repeatableJobs = await metricsQueue.getRepeatableJobs();
     for (const job of repeatableJobs) {
       await metricsQueue.removeRepeatableByKey(job.key);
@@ -49,13 +46,15 @@ async function startWorkers() {
       { traceId: 'metrics-cron-job' },
       {
         repeat: {
-          pattern: '*/5 * * * *', // every 5 minutes
+          pattern: '*/5 * * * *',
         },
-      }
+      },
     );
     logger.info('Successfully scheduled repeatable metrics aggregation cron (every 5 minutes).');
   } catch (err: any) {
-    logger.error('Failed to schedule repeatable metrics job', { error: err.message });
+    logger.error('Failed to schedule repeatable metrics job', {
+      error: err.message,
+    });
   }
 
   logger.info('All queue workers started and listening for jobs.');

@@ -7,16 +7,15 @@ import { logger } from '../utils/logger';
 const prisma = new PrismaClient();
 
 export class ReconciliationController {
-  /**
-   * POST /api/v1/reconciliation/trigger
-   */
   public static async triggerReconciliation(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const traceId = (res.getHeader('X-Trace-ID') as string) || 'default-trace';
 
       const count = await ReconciliationService.triggerBulkReconciliation(traceId);
 
-      logger.info(`Bulk reconciliation run triggered`, { enqueued_jobs_count: count });
+      logger.info(`Bulk reconciliation run triggered`, {
+        enqueued_jobs_count: count,
+      });
       res.status(202).json({
         message: 'Bulk reconciliation processing triggered successfully.',
         enqueued_jobs: count,
@@ -26,9 +25,6 @@ export class ReconciliationController {
     }
   }
 
-  /**
-   * GET /api/v1/reconciliation/reports/:id
-   */
   public static async getReconciliationReport(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
@@ -38,7 +34,10 @@ export class ReconciliationController {
       });
 
       if (!anomaly) {
-        res.status(404).json({ error: 'Not Found', message: `Reconciliation anomaly with ID ${id} not found.` });
+        res.status(404).json({
+          error: 'Not Found',
+          message: `Reconciliation anomaly with ID ${id} not found.`,
+        });
         return;
       }
 
@@ -48,9 +47,6 @@ export class ReconciliationController {
     }
   }
 
-  /**
-   * GET /api/v1/reconciliation/anomalies
-   */
   public static async getActiveAnomalies(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const anomalies = await prisma.reconciliationAnomaly.findMany({

@@ -1,5 +1,3 @@
-import { logger } from './logger';
-
 export class TimeoutError extends Error {
   constructor(message: string) {
     super(message);
@@ -7,14 +5,10 @@ export class TimeoutError extends Error {
   }
 }
 
-/**
- * Wraps a promise factory in a timeout limit.
- * Passes an AbortSignal to the factory, allowing the inner HTTP client to cancel the request upon timeout.
- */
 export async function withTimeout<T>(
   promiseFactory: (signal: AbortSignal) => Promise<T>,
   timeoutMs: number = 2000,
-  context: string = 'Gateway Call'
+  context: string = 'Gateway Call',
 ): Promise<T> {
   const controller = new AbortController();
   const signal = controller.signal;

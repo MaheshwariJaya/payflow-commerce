@@ -12,7 +12,11 @@
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "test": "jest --runInBand",
-    "test:watch": "jest --watch --runInBand"
+    "test:watch": "jest --watch --runInBand",
+    "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" --fix",
+    "format": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "format:fix": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\""
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",

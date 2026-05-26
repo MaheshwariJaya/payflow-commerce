@@ -13,11 +13,10 @@ export class RazorpayAdapter implements IGatewayAdapter {
     paymentMethod: string,
     merchantOrderId: string,
     metadata: any,
-    traceId: string
+    _traceId: string,
   ): Promise<GatewayResponse> {
     const trigger = SimulatorService.parseTrigger(this.name, merchantOrderId, metadata);
 
-    // Simulate delay
     if (trigger.latencyMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, trigger.latencyMs));
     }
@@ -44,7 +43,6 @@ export class RazorpayAdapter implements IGatewayAdapter {
 
     const gatewayRef = `pay_${transactionId}`;
 
-    // Trigger webhook asynchronously
     const actualDelay = trigger.scenario === 'DELAYED_WEBHOOK' ? 8000 : 500;
     const webhookStatus = trigger.scenario === ('AUTH_ONLY' as any) ? 'authorised' : 'captured';
     SimulatorService.triggerAsynchronousWebhook(
@@ -54,7 +52,7 @@ export class RazorpayAdapter implements IGatewayAdapter {
       amountPaise,
       currency,
       webhookStatus as any,
-      actualDelay
+      actualDelay,
     );
 
     return {
@@ -74,8 +72,8 @@ export class RazorpayAdapter implements IGatewayAdapter {
   public async capturePayment(
     transactionId: string,
     gatewayRefId: string,
-    amountPaise: bigint,
-    traceId: string
+    _amountPaise: bigint,
+    _traceId: string,
   ): Promise<GatewayResponse> {
     return {
       success: true,
@@ -89,10 +87,10 @@ export class RazorpayAdapter implements IGatewayAdapter {
   }
 
   public async refundPayment(
-    transactionId: string,
-    gatewayRefId: string,
-    amountPaise: bigint,
-    traceId: string
+    _transactionId: string,
+    _gatewayRefId: string,
+    _amountPaise: bigint,
+    _traceId: string,
   ): Promise<GatewayResponse> {
     const refundId = `rfnd_${crypto.randomUUID()}`;
     return {
@@ -107,7 +105,7 @@ export class RazorpayAdapter implements IGatewayAdapter {
     };
   }
 
-  public async voidPayment(transactionId: string, gatewayRefId: string, traceId: string): Promise<GatewayResponse> {
+  public async voidPayment(transactionId: string, gatewayRefId: string, _traceId: string): Promise<GatewayResponse> {
     return {
       success: true,
       gatewayReferenceId: gatewayRefId,
@@ -123,7 +121,6 @@ export class RazorpayAdapter implements IGatewayAdapter {
     try {
       const razorpaySig = headers['x-razorpay-signature'] || headers['X-Razorpay-Signature'];
       if (!razorpaySig) {
-        // Fallback for direct simulator posts
         const fallbackSig = headers['x-webhook-signature'] || headers['X-Webhook-Signature'];
         if (fallbackSig) {
           const computed = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
@@ -132,10 +129,8 @@ export class RazorpayAdapter implements IGatewayAdapter {
         return false;
       }
 
-      // Re-calculate signature
       const computed = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
 
-      // Timestamp verification (Razorpay can pass timestamp in header or request body)
       const timestampHeader = headers['x-webhook-timestamp'] || headers['X-Webhook-Timestamp'];
       if (timestampHeader) {
         const now = Math.floor(Date.now() / 1000);
@@ -148,7 +143,9 @@ export class RazorpayAdapter implements IGatewayAdapter {
 
       return this.safeCompare(razorpaySig, computed);
     } catch (err: any) {
-      logger.error('Razorpay signature verification exception', { error: err.message });
+      logger.error('Razorpay signature verification exception', {
+        error: err.message,
+      });
       return false;
     }
   }

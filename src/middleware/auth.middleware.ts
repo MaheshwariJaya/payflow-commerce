@@ -9,16 +9,14 @@ export interface AuthenticatedRequest extends Request {
   user?: any;
 }
 
-/**
- * Middleware to authenticate requests using JWT.
- */
 export function authenticateJWT(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res
-      .status(401)
-      .json({ error: 'Unauthorized', message: 'Missing or invalid token format. Expected Bearer <token>' });
+    res.status(401).json({
+      error: 'Unauthorized',
+      message: 'Missing or invalid token format. Expected Bearer <token>',
+    });
     return;
   }
 
@@ -34,9 +32,6 @@ export function authenticateJWT(req: AuthenticatedRequest, res: Response, next: 
   }
 }
 
-/**
- * Middleware to authenticate administrative/internal API calls using X-API-Key.
- */
 export function authenticateApiKey(req: Request, res: Response, next: NextFunction): void {
   const apiKey = req.headers['x-api-key'] || req.headers['x-api-key'.toLowerCase()];
 
@@ -45,16 +40,16 @@ export function authenticateApiKey(req: Request, res: Response, next: NextFuncti
       ip: req.ip,
       path: req.path,
     });
-    res.status(401).json({ error: 'Unauthorized', message: 'Invalid or missing administrative API Key (X-API-Key)' });
+    res.status(401).json({
+      error: 'Unauthorized',
+      message: 'Invalid or missing administrative API Key (X-API-Key)',
+    });
     return;
   }
 
   next();
 }
 
-/**
- * Dual authentication middleware supporting either X-API-Key or Bearer JWT token.
- */
 export function authenticateJWTOrApiKey(req: Request, res: Response, next: NextFunction): void {
   const apiKey = req.headers['x-api-key'] || req.headers['x-api-key'.toLowerCase()];
 
